@@ -328,6 +328,10 @@ namespace cAlgo.Robots
             double totR = barH - barL;
             if (totR > (atrS * MaxCandleAtrMultiplier)) return;
 
+            double bodySize = Math.Abs(close - open);
+            double bodyRatio = bodySize / totR;
+            if (bodyRatio < MinBodyRatio) return;
+
             bool maB = MaLogic == MaModeType.PriceAboveBelow ? close > ema.Result.LastValue : ema.Result.LastValue > ema.Result.Last(1);
             bool maS = MaLogic == MaModeType.PriceAboveBelow ? close < ema.Result.LastValue : ema.Result.LastValue < ema.Result.Last(1);
 
@@ -335,10 +339,20 @@ namespace cAlgo.Robots
             bool rsiLong = (!RSIHiLo && rsiVal > RSIVal) || (RSIHiLo && rsiVal > RSIVal && rsiVal < (100 - RSIVal)) || (RSIReverse && rsiVal < RSIVal);
             bool rsiShort = (!RSIHiLo && rsiVal < (100 - RSIVal)) || (RSIHiLo && rsiVal < (100 - RSIVal) && rsiVal > RSIVal) || (RSIReverse && rsiVal > (100 - RSIVal));
 
+            bool bullSig = close > openHigh && maB && rsiLong;
+            bool bearSig = close < openLow && maS && rsiShort;
+            double rejWick = -1;
+            if(bullSig)
+                rejWick = barH - Math.Max(open, close);
+            else if(bearSig)
+                rejWick = Math.Min(open, close) - barL;
+            if(rejWick / totR > MaxRejectionWickRatio) return;
+
+
             if (open >= openLow && open <= openHigh)
             {
-                if (close > openHigh && maB && rsiLong) ProcessEntry(TradeType.Buy);
-                else if (close < openLow && maS && rsiShort) ProcessEntry(TradeType.Sell);
+                if (bullSig) ProcessEntry(TradeType.Buy);
+                else if (bearSig) ProcessEntry(TradeType.Sell);
             }
         }
 
