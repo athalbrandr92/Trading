@@ -147,7 +147,7 @@ namespace cAlgo.Robots
 
         [Parameter("Ind Macro ATR Mult", DefaultValue = 0.5, MinValue = 0.1, MaxValue = 2.0, Step = 0.1, Group = "9. Indicator Core")] 
         public double IndMacroAtrMult { get; set; }
-        [Parameter("Ind Micro ATR Mult", DefaultValue = 0.2, MinValue = 0.0, MaxValue = 0.1, Step = 0.05, Group = "9. Indicator Core")] 
+        [Parameter("Ind Micro ATR Mult", DefaultValue = 0.2, MinValue = 0.0, MaxValue = 1, Step = 0.05, Group = "9. Indicator Core")] 
         public double IndMicroAtrMult { get; set; }
         [Parameter("Psych Step", DefaultValue = 25, Group = "9. Indicator Core")] 
         public double IndPsychLevelStep { get; set; }
