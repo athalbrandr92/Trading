@@ -17,10 +17,20 @@ namespace cAlgo.Robots
         public int EndTime { get; set; }
         [Parameter("Open Range Minute", DefaultValue = 0, MinValue = 0, MaxValue = 59, Group = "1. Time")] 
         public int OpenRangeMin { get; set; }
-
-        // --- 2. STRATEGY SETTINGS ---
-        [Parameter("Lookback Bars", DefaultValue = 12, MinValue = 1, MaxValue = 90, Group = "2. Strategy")] 
+        [Parameter("Lookback Bars", DefaultValue = 12, MinValue = 1, MaxValue = 90, Group = "1. Time")] 
         public int LookbackBars { get; set; }
+        [Parameter("Enable Holiday Blackout", DefaultValue = true, Group = "1. Time")] 
+        public bool EnableHolidayBlackout { get; set; }
+        [Parameter("Blackout Start Month", DefaultValue = 12, MinValue = 12, MaxValue = 12, Group = "1. Time")] 
+        public int BlackoutStartMonth { get; set; }
+        [Parameter("Blackout Start Day", DefaultValue = 20, MinValue = 10, MaxValue = 24, Group = "1. Time")] 
+        public int BlackoutStartDay { get; set; }
+        [Parameter("Blackout End Month", DefaultValue = 1, MinValue = 1, MaxValue = 1, Group = "1. Time")] 
+        public int BlackoutEndMonth { get; set; }
+        [Parameter("Blackout End Day", DefaultValue = 5, MinValue = 2, MaxValue = 10, Group = "1. Time")] 
+        public int BlackoutEndDay { get; set; }
+
+        // --- 2. STRATEGY SETTINGS ---        
         [Parameter("Risk Percentage", DefaultValue = 1.0, MinValue = 0.1, MaxValue = 4.9, Step = 0.1, Group = "2. Risk Management")] 
         public double Risk { get; set; }
         [Parameter("Max Dollar Risk", DefaultValue = 1000.0, Group = "2. Strategy")] 
@@ -42,141 +52,129 @@ namespace cAlgo.Robots
         [Parameter("Enable Wolfe Override", DefaultValue = true, Group = "2. Strategy")] 
         public bool UseWolfeOverride { get; set; }
 
-        // --- 3. INDICATOR SETTINGS ---
-        [Parameter("MA Lookback", DefaultValue = 150, MinValue = 2, MaxValue = 500, Group = "3. Indicators")] 
+        // --- 3. Filter Settings ---
+        [Parameter("MA Lookback", DefaultValue = 150, MinValue = 2, MaxValue = 500, Group = "3. Filter Settings")] 
         public int MALookback { get; set; }
         public enum MaModeType { PriceAboveBelow, SlopeRisingFalling }
-        [Parameter("MA Logic Mode", DefaultValue = MaModeType.PriceAboveBelow, Group = "3. Indicators")] 
+        [Parameter("MA Logic Mode", DefaultValue = MaModeType.PriceAboveBelow, Group = "3. Filter Settings")] 
         public MaModeType MaLogic { get; set; }
-        [Parameter("RSI Threshold", DefaultValue = 25, MinValue = 0, MaxValue = 100, Step = 5, Group = "3. Indicators")] 
+        [Parameter("RSI Threshold", DefaultValue = 25, MinValue = 0, MaxValue = 100, Step = 5, Group = "3. Filter Settings")] 
         public int RSIVal { get; set; }
-        [Parameter("RSI High-Low", DefaultValue = true, Group = "3. Indicators")] 
+        [Parameter("RSI High-Low", DefaultValue = true, Group = "3. Filter Settings")] 
         public bool RSIHiLo { get; set; }
-        [Parameter("RSI Reverse", DefaultValue = false, Group = "3. Indicators")] 
+        [Parameter("RSI Reverse", DefaultValue = false, Group = "3. Filter Settings")] 
         public bool RSIReverse { get; set; }
 
-        // --- 4. ADX FILTER ---
         public enum AdxFilterMode { Off, Min, Max, MinMax }
-        [Parameter("ADX Mode", DefaultValue = AdxFilterMode.MinMax, Group = "4. ADX Filter")] 
+        [Parameter("ADX Mode", DefaultValue = AdxFilterMode.MinMax, Group = "3. Filter Settings")] 
         public AdxFilterMode AdxMode { get; set; }
-        [Parameter("ADX Period", DefaultValue = 14, MinValue = 5, MaxValue = 50, Step = 1, Group = "4. ADX Filter")] 
+        [Parameter("ADX Period", DefaultValue = 14, MinValue = 5, MaxValue = 50, Step = 1, Group = "3. Filter Settings")] 
         public int AdxPeriod { get; set; }
-        [Parameter("ADX Min Level", DefaultValue = 15, MinValue = 5, MaxValue = 40, Step = 2.5, Group = "4. ADX Filter")] 
+        [Parameter("ADX Min Level", DefaultValue = 15, MinValue = 5, MaxValue = 40, Step = 2.5, Group = "3. Filter Settings")] 
         public double AdxMin { get; set; }
-        [Parameter("ADX Max Level", DefaultValue = 27.5, MinValue = 15, MaxValue = 60, Step =  2.5, Group = "4. ADX Filter")] 
+        [Parameter("ADX Max Level", DefaultValue = 27.5, MinValue = 15, MaxValue = 60, Step =  2.5, Group = "3. Filter Settings")] 
         public double AdxMax { get; set; }
-
-        // --- 5. FILTERS ---
-        [Parameter("Min Body Ratio", DefaultValue = 0.3, MinValue = 0.2, MaxValue = 1.0, Step = 0.1, Group = "5. Filters")] 
+        [Parameter("Min Body Ratio", DefaultValue = 0.3, MinValue = 0.2, MaxValue = 1.0, Step = 0.1, Group = "3. Filter Settings")] 
         public double MinBodyRatio { get; set; }
-        [Parameter("Max Rejection Wick", DefaultValue = 0.0, MinValue = 0.0, MaxValue = 0.5, Step = 0.1, Group = "5. Filters")] 
+        [Parameter("Max Rejection Wick", DefaultValue = 0.0, MinValue = 0.0, MaxValue = 0.5, Step = 0.1, Group = "3. Filter Settings")] 
         public double MaxRejectionWickRatio { get; set; }
-        [Parameter("Max Spread (Pips)", DefaultValue = 45, MinValue = 0.5, MaxValue = 1000, Step = 0.5, Group = "5. Filters")] 
+        [Parameter("Max Spread (Pips)", DefaultValue = 45, MinValue = 0.5, MaxValue = 1000, Step = 0.5, Group = "3. Filter Settings")] 
         public double MaxSpread { get; set; }
-        [Parameter("Max Candle (ATR Mult)", DefaultValue = 2.8, MinValue = 1.0, MaxValue = 4.0, Step = 0.25, Group = "5. Filters")] 
+        [Parameter("Max Candle (ATR Mult)", DefaultValue = 2.8, MinValue = 1.0, MaxValue = 4.0, Step = 0.25, Group = "3. Filter Settings")] 
         public double MaxCandleAtrMultiplier { get; set; }
-        [Parameter("Min Volatility Ratio", DefaultValue = 0.7, MinValue = 0.5, MaxValue = 2.0, Step = 0.1, Group = "5. Filters")] 
+        [Parameter("Min Volatility Ratio", DefaultValue = 0.7, MinValue = 0.5, MaxValue = 2.0, Step = 0.1, Group = "3. Filter Settings")] 
         public double MinVolatilityRatio { get; set; }
-        [Parameter("ATR Short Period", DefaultValue = 14, MinValue = 2, MaxValue = 20, Step = 1, Group = "5. Filters")] 
+        [Parameter("ATR Short Period", DefaultValue = 14, MinValue = 2, MaxValue = 20, Step = 1, Group = "3. Filter Settings")] 
         public int AtrPeriod { get; set; }
-        [Parameter("ATR Long Period", DefaultValue = 100, MinValue = 10, MaxValue = 250, Step = 5, Group = "5. Filters")] 
+        [Parameter("ATR Long Period", DefaultValue = 100, MinValue = 10, MaxValue = 250, Step = 5, Group = "3. Filter Settings")] 
         public int AtrLongPeriod { get; set; }
-        [Parameter("Enable Holiday Blackout", DefaultValue = true, Group = "5. Filters")] 
-        public bool EnableHolidayBlackout { get; set; }
-        [Parameter("Blackout Start Month", DefaultValue = 12, MinValue = 12, MaxValue = 12, Group = "5. Filters")] 
-        public int BlackoutStartMonth { get; set; }
-        [Parameter("Blackout Start Day", DefaultValue = 20, MinValue = 10, MaxValue = 24, Group = "5. Filters")] 
-        public int BlackoutStartDay { get; set; }
-        [Parameter("Blackout End Month", DefaultValue = 1, MinValue = 1, MaxValue = 1, Group = "5. Filters")] 
-        public int BlackoutEndMonth { get; set; }
-        [Parameter("Blackout End Day", DefaultValue = 5, MinValue = 2, MaxValue = 10, Group = "5. Filters")] 
-        public int BlackoutEndDay { get; set; }
 
-        // --- 6. TRAILING STOPS ---
+
+        // --- 4. TRAILING STOPS ---
         public enum TrailType { None, PSAR, MTF_EMA, Extrema, Chandelier }
-        [Parameter("Trailing Type", DefaultValue = TrailType.None, Group = "6. Trailing")] 
+        [Parameter("Trailing Type", DefaultValue = TrailType.None, Group = "4. Trailing")] 
         public TrailType SelectedTrail { get; set; }
-        [Parameter("Trail TimeFrame", DefaultValue = "Hour", Group = "6. Trailing")] 
+        [Parameter("Trail TimeFrame", DefaultValue = "Hour", Group = "4. Trailing")] 
         public TimeFrame TrailTF { get; set; }
-        [Parameter("EMA Trail Period", DefaultValue = 49, MinValue = 2, MaxValue = 100, Step = 1, Group = "6. Trailing")] 
+        [Parameter("EMA Trail Period", DefaultValue = 49, MinValue = 2, MaxValue = 100, Step = 1, Group = "4. Trailing")] 
         public int EmaTrailPeriod { get; set; }
-        [Parameter("Extrema Lookback (Bars)", DefaultValue = 6, MinValue = 1, MaxValue = 50, Group = "6. Trailing")] 
+        [Parameter("Extrema Lookback (Bars)", DefaultValue = 6, MinValue = 1, MaxValue = 50, Group = "4. Trailing")] 
         public int ExtremaBars { get; set; }
-        [Parameter("PSAR Min AF", DefaultValue = 0.02, MinValue = 0.01, MaxValue = 0.1, Step = 0.01, Group = "6. Trailing")] 
+        [Parameter("PSAR Min AF", DefaultValue = 0.02, MinValue = 0.01, MaxValue = 0.1, Step = 0.01, Group = "4. Trailing")] 
         public double PsarMinAF { get; set; }
-        [Parameter("PSAR Max AF", DefaultValue = 0.2, MinValue = 0.1, MaxValue = 1.0, Step = 0.05, Group = "6. Trailing")] 
+        [Parameter("PSAR Max AF", DefaultValue = 0.2, MinValue = 0.1, MaxValue = 1.0, Step = 0.05, Group = "4. Trailing")] 
         public double PsarMaxAF { get; set; }
-        [Parameter("Chandelier Mult", DefaultValue = 3.0, MinValue = 0.25, MaxValue = 5.0, Step = 0.25, Group = "6. Trailing")] 
+        [Parameter("Chandelier Mult", DefaultValue = 3.0, MinValue = 0.25, MaxValue = 5.0, Step = 0.25, Group = "4. Trailing")] 
         public double ChandelierMult { get; set; }
 
-        // --- 7. MANAGEMENT ---
-        [Parameter("Max Positions", DefaultValue = 1, MinValue = 1, MaxValue = 10, Group = "7. Management")] public int MaxPositions { get; set; }
-        [Parameter("Order Magic", DefaultValue = 1, Group = "7. Management")] public int OrderMagic { get; set; }
+        // --- 5. MANAGEMENT ---
+        [Parameter("Max Positions", DefaultValue = 1, MinValue = 1, MaxValue = 10, Group = "5. Management")] public int MaxPositions { get; set; }
+        [Parameter("Order Magic", DefaultValue = 1, Group = "5. Management")] public int OrderMagic { get; set; }
 
-        // --- 8. FITNESS ---
-        [Parameter("Min Trades", DefaultValue = 75, Group = "8. Fitness")] 
+        // --- 6. FITNESS ---
+        [Parameter("Min Trades", DefaultValue = 75, Group = "6. Fitness")] 
         public int MinTrades { get; set; }
-        [Parameter("Linear Bonus?", DefaultValue = false, Group = "8. Fitness")] 
+        [Parameter("Linear Bonus?", DefaultValue = false, Group = "6. Fitness")] 
         public bool LinBon { get; set; }
-        [Parameter("Linear Divisor", DefaultValue = 3, Group = "8. Fitness")] 
+        [Parameter("Linear Divisor", DefaultValue = 3, Group = "6. Fitness")] 
         public int LinDiv { get; set; }
-        [Parameter("Hyperbolic Exponent", DefaultValue = 0.75, Group = "8. Fitness")] 
+        [Parameter("Hyperbolic Exponent", DefaultValue = 0.75, Group = "6. Fitness")] 
         public double HypExp { get; set; }
 
-        // --- 9. SNR MANAGEMENT ---
-        [Parameter("Rejection Logic", DefaultValue = RejectionMode.WickInsideCloseOutside, Group = "9. SnR Management")] 
+        // --- 7. SNR MANAGEMENT ---
+        [Parameter("Rejection Logic", DefaultValue = RejectionMode.WickInsideCloseOutside, Group = "7. SnR Management")] 
         public RejectionMode SnRRejectionMode { get; set; }
 
-        // --- 10-13. INDICATOR S&R PARAMETERS (Passed to dynamic initialization) ---
-        [Parameter("Show Multiday", DefaultValue = true, Group = "10. Indicator Vis")] 
+        // --- 8-11. INDICATOR S&R PARAMETERS (Passed to dynamic initialization) ---
+        [Parameter("Show Multiday", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowMultiday { get; set; }
-        [Parameter("Show Prev Day", DefaultValue = true, Group = "10. Indicator Vis")] 
+        [Parameter("Show Prev Day", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowPreviousDay { get; set; }
-        [Parameter("Show Asian", DefaultValue = true, Group = "10. Indicator Vis")] 
+        [Parameter("Show Asian", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowAsianSession { get; set; }
-        [Parameter("Show London", DefaultValue = true, Group = "10. Indicator Vis")] 
+        [Parameter("Show London", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowLondonSession { get; set; }
-        [Parameter("Show NY", DefaultValue = true, Group = "10. Indicator Vis")] 
+        [Parameter("Show NY", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowNySession { get; set; }
-        [Parameter("Show Psych", DefaultValue = true, Group = "10. Indicator Vis")] 
+        [Parameter("Show Psych", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowPsychLevels { get; set; }
-        [Parameter("Show OBs", DefaultValue = true, Group = "10. Indicator Vis")] 
+        [Parameter("Show OBs", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowOrderBlocks { get; set; }
-        [Parameter("Show Doubles", DefaultValue = true, Group = "10. Indicator Vis")] 
+        [Parameter("Show Doubles", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowDoubleTopsBottoms { get; set; }
-        [Parameter("Show Consolidation", DefaultValue = true, Group = "10. Indicator Vis")] 
+        [Parameter("Show Consolidation", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowConsolidation { get; set; }
 
-        [Parameter("Ind Macro ATR Mult", DefaultValue = 0.5, MinValue = 0.1, MaxValue = 2.0, Step = 0.1, Group = "11. Indicator Core")] 
+        [Parameter("Ind Macro ATR Mult", DefaultValue = 0.5, MinValue = 0.1, MaxValue = 2.0, Step = 0.1, Group = "9. Indicator Core")] 
         public double IndMacroAtrMult { get; set; }
-        [Parameter("Ind Micro ATR Mult", DefaultValue = 0.2, MinValue = 0.0, MaxValue = 0.1, Step = 0.05, Group = "11. Indicator Core")] 
+        [Parameter("Ind Micro ATR Mult", DefaultValue = 0.2, MinValue = 0.0, MaxValue = 0.1, Step = 0.05, Group = "9. Indicator Core")] 
         public double IndMicroAtrMult { get; set; }
-        [Parameter("Psych Step", DefaultValue = 25, Group = "11. Indicator Core")] 
+        [Parameter("Psych Step", DefaultValue = 25, Group = "9. Indicator Core")] 
         public double IndPsychLevelStep { get; set; }
-        [Parameter("UTC Offset", DefaultValue = -5, MinValue = -12, MaxValue = 12, Group = "11. Indicator Core")] 
+        [Parameter("UTC Offset", DefaultValue = -5, MinValue = -12, MaxValue = 12, Group = "9. Indicator Core")] 
         public int IndUtcOffset { get; set; }
-        [Parameter("Multiday TF", DefaultValue = "Weekly", Group = "11. Indicator Core")] 
+        [Parameter("Multiday TF", DefaultValue = "Weekly", Group = "9. Indicator Core")] 
         public TimeFrame IndMultidayTimeFrame { get; set; }
-        [Parameter("Multiday Lookback", DefaultValue = 1, MinValue = 1, MaxValue = 42, Group = "11. Indicator Core")] 
+        [Parameter("Multiday Lookback", DefaultValue = 1, MinValue = 1, MaxValue = 42, Group = "9. Indicator Core")] 
         public int IndMultidayLookback { get; set; }
 
-        [Parameter("Asian Start", DefaultValue = 18, MinValue = 0, MaxValue = 23, Step = 1, Group = "12. Indicator Sessions")] 
+        [Parameter("Asian Start", DefaultValue = 18, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndAsianStartHour { get; set; }
-        [Parameter("Asian End", DefaultValue = 3, MinValue = 0, MaxValue = 23, Step = 1, Group = "12. Indicator Sessions")] 
+        [Parameter("Asian End", DefaultValue = 3, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndAsianEndHour { get; set; }
-        [Parameter("London Start", DefaultValue = 3, MinValue = 0, MaxValue = 23, Step = 1, Group = "12. Indicator Sessions")] 
+        [Parameter("London Start", DefaultValue = 3, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndLondonStartHour { get; set; }
-        [Parameter("London End", DefaultValue = 11, MinValue = 0, MaxValue = 23, Step = 1, Group = "12. Indicator Sessions")] 
+        [Parameter("London End", DefaultValue = 11, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndLondonEndHour { get; set; }
-        [Parameter("NY Start", DefaultValue = 8, MinValue = 0, MaxValue = 23, Step = 1, Group = "12. Indicator Sessions")] 
+        [Parameter("NY Start", DefaultValue = 8, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndNyStartHour { get; set; }
-        [Parameter("NY End", DefaultValue = 17, MinValue = 0, MaxValue = 23, Step = 1, Group = "12. Indicator Sessions")] 
+        [Parameter("NY End", DefaultValue = 17, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndNyEndHour { get; set; }
 
-        [Parameter("Min Formation", DefaultValue = 10, MinValue = 3, MaxValue = 30, Step = 1, Group = "13. Indicator Patterns")] 
+        [Parameter("Min Formation", DefaultValue = 10, MinValue = 3, MaxValue = 30, Step = 1, Group = "11. Indicator Patterns")] 
         public int IndMinFormationCandles { get; set; }
-        [Parameter("Max Lookback", DefaultValue = 50, MinValue = 15, MaxValue = 150, Step = 5, Group = "13. Indicator Patterns")] public int IndMaxLookbackCandles { get; set; }
-        [Parameter("Max Consolidation ATR", DefaultValue = 1.5, MinValue = 0.25, MaxValue = 5.0, Step = 0.25, Group = "13. Indicator Patterns")] public double IndMaxConsolidationAtrWidth { get; set; }
+        [Parameter("Max Lookback", DefaultValue = 50, MinValue = 15, MaxValue = 150, Step = 5, Group = "11. Indicator Patterns")] public int IndMaxLookbackCandles { get; set; }
+        [Parameter("Max Consolidation ATR", DefaultValue = 1.5, MinValue = 0.25, MaxValue = 5.0, Step = 0.25, Group = "11. Indicator Patterns")] public double IndMaxConsolidationAtrWidth { get; set; }
 
         private Bars _htfBars, _dailyBars;
         private double openHigh, openLow, p1Price, p4Price;
