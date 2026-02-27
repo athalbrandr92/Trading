@@ -1,5 +1,7 @@
 Optimizer parameters for Range Breakout v27
 
+***IMPORTANT UPDATE*** Nearly all of the parameters have MinValue, MaxValue, and Step set in the code now. If my prior recommendations fall outside these values, use the hardcoded values, at least at first. If there is no MinValue, MaxValue, or Step set for that parameter and it isn't a Boolean, that means you *should not optimize it*. Some of the values that do have minimums and maximums shouldn't be optimized, either - seriously, ***do not*** let the optimizer choose your risk settings. That is a good way to blow an account. Side note regarding the Risk% setting - it's now capped at 4.9% so that people don't load this up on a prop firm account and kill their evaluation in a single trade. Realistically, though, your risk setting per trade should be somewhere between 0.2-2%, maximum. If you want to remove the guardrails for any of these parameters, you are free to do so - you've got the source code. ***DO NOT BLAME ME IF YOU CHANGE THE SETTINGS OUTSIDE OF THE PARAMETERS I HAVE SET AND WIND UP BLOWING YOUR ACCOUNT.***
+
 Timeframe: probably no need to let the optimizer change this - optimize the lower timeframes the bot was designed for first and then move up. If you're using tick data, feel free to drop all the way down to the m1. I started my optimizations on the m5, using m1 prices instead of ticks.
 
 Start time (hour): within one to two hours before and within one to two hours after the start hour of the primary trading hour of the asset (i.e. Gold typically optimizes 8AM to 9AM start times)
