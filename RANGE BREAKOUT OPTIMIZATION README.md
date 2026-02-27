@@ -2,6 +2,7 @@ Optimizer parameters for Range Breakout v27
 
 ***IMPORTANT UPDATE*** Nearly all of the parameters have MinValue, MaxValue, and Step set in the code now. If my prior recommendations fall outside these values, use the hardcoded values, at least at first. If there is no MinValue, MaxValue, or Step set for that parameter and it isn't a Boolean, that means you *should not optimize it*. Some of the values that do have minimums and maximums shouldn't be optimized, either - seriously, ***do not*** let the optimizer choose your risk settings. That is a good way to blow an account. Side note regarding the Risk% setting - it's now capped at 4.9% so that people don't load this up on a prop firm account and kill their evaluation in a single trade. Realistically, though, your risk setting per trade should be somewhere between 0.2-2%, maximum. If you want to remove the guardrails for any of these parameters, you are free to do so - you've got the source code. ***DO NOT BLAME ME IF YOU CHANGE THE SETTINGS OUTSIDE OF THE PARAMETERS I HAVE SET AND WIND UP BLOWING YOUR ACCOUNT.***
 
+***--- 1. TIME SETTINGS ---***
 Timeframe: probably no need to let the optimizer change this - optimize the lower timeframes the bot was designed for first and then move up. If you're using tick data, feel free to drop all the way down to the m1. I started my optimizations on the m5, using m1 prices instead of ticks.
 
 Start time (hour): within one to two hours before and within one to two hours after the start hour of the primary trading hour of the asset (i.e. Gold typically optimizes 8AM to 9AM start times)
@@ -12,11 +13,19 @@ Open range minute: the minute at which to form the range, looking back over {Loo
 
 Lookback bars: As mentioned above, how many *bars* to look back over - these should typically be stepped in increments of whatever gives you 5, 10, or 15 minute intervals between 1 and whatever the max for that timeframe is. I.E. typical m5 Lookback bars value I optimize is 3-12 by 3, so 15 minute range up to one full hour by 15-minute intervals. Note - much higher timeframes (h1+) start to lose meaning just a bit as far as a daily range is concerned - it flat won't work on the D1+.
 
+Enable Holiday Blackout: You *REALLY* want this turned on. Over the low-liquidity-high-volatility holiday weeks of late December 2025, the price on XAUUSD jumped damn near 400 points on a single price tick - even a 0.01 lot size would have cost you ~$400 in less than a second if you'd had a short trade open at the time. PLEASE do not turn this off unless you are absolutely certain you're willing to risk that kind of movement or are absolutely certain you'll have your trade placed in the right direction if something like that happens again.
+
+Blackout Start and End months and days: Numerical months and days to begin and end the blackout on. Defaults to 12/20 - 1/5. Feel free to push the start up as late as Christmas Eve if you know you'll be closing your positions manually on Dec 23 and drop the end to as early as January 2. The important thing is to be out of the market from Christmas to New Year's.
+
+***--- 2. STRATEGY SETTINGS ---***
 Risk%: what amount to attempt to risk per trade - it might wind up slightly (or more than slightly in some cases) off due to rounding and account size vs minimum lot size. DO NOT OPTIMIZE THIS UNLESS YOU ARE ABSOLUTELY CERTAIN YOU KNOW WHAT YOU ARE DOING. THIS IS THE MOST LIKELY PARAMETER TO BLOW YOUR ACCOUNT.
 
 Max Dollar Risk: Max risk in dollars (or perhaps account currency, look at the code for clarification) above which you will not take the trade no matter how good the setup is. This is related to a tiered stop loss - the Range Breakout bot first attempts to place its SL at the opposite side of the range +- an ATR-based buffer, then compares the trade risk to the Max Dollar Risk - if it exceeds it (because, say, you're trading XAUUSD on a $5k account) it then tries dropping the ATR buffer, then if it still exceeds the Max Dollar Risk, it refuses to place the trade. Don't optimize this - decide beforehand what risk you're willing to tolerate.
 
 ATR Buffer Mult: Remember what I just said about an ATR-based buffer extending the SL from the exact opposite side of the range? This is it. I typically let it optimize from 0.5-2.5 by 0.5.
+
+***Note - For the TP methods below, to save time and prevent yourself from confusing the genetic optimizer with meaningless extra passes, uncheck whichever of these do not apply to your current TP method.***
+***Note #2 - if you're confident you have the *ENTIRE* rest of the strategy optimized and want to run the genetic optimizer to test which TP method and values perform best for those specific settings, uncheck everything else and check all TP method boxes - if you want to test both TP methods and Trailing Stop methods after fully optimizing for time and filters, do the same but also check all trailing SL boxes.***
 
 R:R Ratio (Long) and (Short): these tell the bot how far out to place the take profit in either direction if Primary TP Mode is set to fixed or HalfandHalf. Flat multiple of the final SL distance (including the buffer). For fixed, the entire position is linked to the set TP - for HalfandHalf, half of the position (rounded up to the nearest 0.01 lot) is closed on the TP and the rest is allowed to run with only a trailing stop and the rejection logic telling it when to close. Uncheck these if not using Fixed or HalfandHalf.
 
@@ -28,6 +37,7 @@ Extrema Lookback (Days): How many days to look back over to get the "daily" high
 
 Enable Wolfe Override: Look up Wolfe waves if you're curious - they're geometric chart formations that project a price line into the future. If this is active, the bot continuously scans for Wolfe Wave patterns and will override your current TP (or set a new one for Trailing Only) to be the current Estimated Price on Arrival (EPA) projected by the Wolfe wave. 
 
+***---3. Filter Settings---***
 MA Lookback: used for the EMA filter. I use 150 by default and haven't bothered optimizing it in a long time. Use your judgement. It works with the MA Logic Mode parameter to determine how to filter trades - either the price has to be above or below the EMA or the EMA has to be climbing or dropping to allow the trade.
 
 MA Logic Mode: PriceAboveBelow and SlopeRisingFalling, described under "MA Lookback". I have found zero significant difference between the two methods and no longer bother optimizing it - I just set it to PriceAboveBelow to save a few CPU cycles.
@@ -60,25 +70,30 @@ ATR Short period: the lookback period for the short ATR (which I believe is also
 
 ATR Long period: the lookback period for the long ATR. I leave this at 100 these days, though it also shows decent results at 150 and 200. If you're going to optimize it, I recommend 50-250 by 50.
 
-Enable Holiday Blackout: You *REALLY* want this turned on. Over the low-liquidity-high-volatility holiday weeks of late December 2025, the price on XAUUSD jumped damn near 400 points on a single price tick - even a 0.01 lot size would have cost you ~$400 in less than a second if you'd had a short trade open at the time. PLEASE do not turn this off unless you are absolutely certain you're willing to risk that kind of movement or are absolutely certain you'll have your trade placed in the right direction if something like that happens again.
+***--- 4. TRAILING STOPS ---***
 
-Blackout Start and End months and days: Numerical months and days to begin and end the blackout on. Defaults to 12/20 - 1/5. Feel free to push the start up as late as Christmas Eve if you know you'll be closing your positions manually on Dec 23 and drop the end to as early as January 2. The important thing is to be out of the market from Christmas to New Year's.
+***Note - For the trailing SL methods below, to save time and prevent yourself from confusing the genetic optimizer with meaningless extra passes, uncheck whichever of these do not apply to your current trailing SL method.***
+***Note #2 - if you're confident you have the *ENTIRE* rest of the strategy optimized and want to run the genetic optimizer to test which trailing SL method and values perform best for those specific settings, uncheck everything else and check all trailing SL method boxes - if you want to test both TP methods and Trailing Stop methods after fully optimizing for time and filters, do the same but also check all TP method boxes.***
 
 Trailing type: Five options. None (no trail), PSAR (trailed on the PSAR indicator), EMA (trailed on the EMA), Extrema (trailed at the high/low of the last x candles) and Chandelier (ATR-based, "hangs the chandelier" from the highest point back to x ATR multiple away from the current price). I don't usually optimize this anymore - damn near every asset does kinda meh with no trail, Metals don't like the PSAR (at least on timeframes near the current one), everything seems to do okay with EMA, Extrema works on a handful of assets, and Chandelier has a pretty good performance across most assets. Feel free to experiment - I still intend to toy around with this parameter especially once I have all my assets and timeframes set up how I want and have a better computer to run the optimizations faster.
 
 Trail Timeframe: Any timeframe can be set as the source for the trail. It will load up the indicator (or Bars object) for that timeframe and trail it there. This one tends to produce the best results between the h1 and the h4, at least when trading on the m5. Not too tight as this strategy is meant to find runners (day to swing trading rather than scalping) but no so loose as to be useless.
 
-EMA Trail Period: Lookback for the EMA trail. I highly recommend doing something that seems kinda retarded at first glance - 49 to 147 by 7 gives decent results. If you're a stickler for 10s, 50-150 by 10 is also decent.
+EMA Trail Period: Lookback for the EMA trail. I highly recommend doing something that seems kinda retarded at first glance - 49 to 147 by 7 gives decent results. If you're a stickler for 10s, 50-150 by 10 is also decent. Uncheck if not specifically using the EMA trail method.
 
-Extrema Lookback: how many bars to look back for extrema if using that stop loss method. I'll be quite honest - I have no idea exactly what this should be set to. I haven't really gotten good results consistently enough to know. I'd recommend if you're going to try it to start with a broad pass of something like 5 or 10 to 100 by either 5 or 10 and narrow it after getting a consistent range.
+Extrema Lookback: how many bars to look back for extrema if using that stop loss method. I'll be quite honest - I have no idea exactly what this should be set to. I haven't really gotten good results consistently enough to know. I'd recommend if you're going to try it to start with a broad pass of something like 5 or 10 to 100 by either 5 or 10 and narrow it after getting a consistent range. Uncheck if not specifically using the Extrema method.
 
-PSAR Min AF and Max AF: Settings for the PSAR acceleration factor (how quickly it tightens in to the price as the trend continues). I usually set these to 0.01-0.1 by 0.01 and 0.1-1 by 0.1 if I'm using the PSAR trail.
+PSAR Min AF and Max AF: Settings for the PSAR acceleration factor (how quickly it tightens in to the price as the trend continues). I usually set these to 0.01-0.1 by 0.01 and 0.1-1 by 0.1 if I'm using the PSAR trail. Uncheck if not specifically using the PSAR method.
 
-Chandelier Mult: Multiplier for the Chandelier ATR. I optimize this as either 0.5-4 by 0.5 by 0.25 - I'm currently running some optimizations with the range tightened to 1.75-3.5 by 0.25 because most of my best results have come from that range.
+Chandelier Mult: Multiplier for the Chandelier ATR. I optimize this as either 0.5-4 by 0.5 by 0.25 - I'm currently running some optimizations with the range tightened to 1.75-3.5 by 0.25 because most of my best results have come from that range. Uncheck if not specifically using the Chandelier method.
+
+***// --- 5. MANAGEMENT ---***
 
 Max Positions: if you want the bot to be allowed to have multiple positions open at once. I haven't played with this much as I'm starting on a $5k account and risking multiple max losses in a single day just sounds terrible. 1 position at a time with risk set to 0.2% per trade can quite easily return 25% or more per year with Max Drawdowns below 5%, typically below 3%. I may toy with this one later on when I've got more equity for cushion.
 
 Order Magic: no effect whatsoever on individual bot instances. Just to tell the bot "these trades were placed by this instance, those were not" so that it doesn't try to update your BTC stop loss based on your XAU rules.
+
+***--- 6. FITNESS ---***
 
 Min Trades: Target minimum trades for the custom GetFitness function. Refer to the project README for how the fitness function works.
 
@@ -88,7 +103,11 @@ Linear Divisor: its use was just described. Don't let the optimizer change this 
 
 Hyperbolic Exponent: If Linear Bonus is no, then the number of trades is raised to this exponent instead of being divided linearly. To prevent overtrading, have this number be below 1. I know the default is 0.6, but I usually use 0.75 instead.
 
+***--- 7. SNR MANAGEMENT ---***
+
 Rejection Logic: Wick in close out or close in close out. This relates to the DynamicSnRBoxes tie in - should the position close if price wicked into a zone only, or should it only be considered a valid rejection if a candle actually closed inside the zone and the next closed outside? No idea which is better yet, just leave it clicked.
+
+***--- 8-11. INDICATOR S&R PARAMETERS (Passed to dynamic initialization) ---***
 
 Show {whatthefuckever}: Use these zones for the rejection logic? Turn them all off to disable the DynamicSnRBoxes tie-in entirely, or turn off just specific ones that interfere with your best trades. Up to you.
 
