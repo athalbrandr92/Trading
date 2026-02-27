@@ -62,9 +62,9 @@ ADX Min Level: the minimum ADX for Min and MinMax modes. I typically optimize th
 
 ADX Max Level: the maximum ADX for Max and MinMax modes. I typically optimize this between 20-40 or 25-35 by 1.
 
-Min Body Ratio: The minimum ratio the body of the candle must be of the total size of the candle (to rule out spinning tops and dojis). This has *very* little effect on the overall strategy now that the other filters are in place. Reasonable values should start at 0.2 or 0.3 and go up to anywhere between 0.5 and 0.8, step 0.1.
+Min Body Ratio: The minimum ratio the body of the candle must be of the total size of the candle (to rule out spinning tops and dojis). Reasonable values should start at 0.2 or 0.3 and go up to anywhere between 0.5 and 0.8, step 0.1.
 
-Max Rejection Wick: The maximum ratio of the opposite wick of the signal candle to overall candle size. This also has *very little* effect with the other filters activated. I set it to optimize between 0.0 and either 0.3 or 0.5 by 0.1.
+Max Rejection Wick: The maximum ratio of the opposite wick of the signal candle to overall candle size. I set it to optimize between 0.0 and either 0.3 or 0.5 by 0.1.
 
 Max Spread (Pips): Highly asset-dependant. Recommend only testing this while using real ticks. I typically optimize everything else first on m1 data using typical max liquidity spread (so like 25 for XAUUSD or 0.0 for EURUSD) and then run it over real ticks with this being optimized at reasonable levels compared to the typical spread (i.e. 25-50 by 5 for XAUUSD, 0.0-0.5 by 0.1 for EURUSD, etc.). If you're running an m1 optimization over real ticks, you may need to optimize for this from the start, or just nuke it by setting the max allowable really high.
 
