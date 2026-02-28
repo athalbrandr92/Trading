@@ -37,14 +37,14 @@ namespace cAlgo.Robots
         public double MaxDollarRisk { get; set; }
         [Parameter("ATR Buffer Mult", DefaultValue = 0.5, MinValue = 0.0, MaxValue = 5.0, Step = 0.25, Group = "2. Strategy")] 
         public double AtrBufferMult { get; set; }
-        [Parameter("R:R Ratio (Long)", DefaultValue = 9.75, MinValue = 0.5, MaxValue = 15, Step = 0.25, Group = "2. Strategy")] 
-        public double RRRatioLong { get; set; }
-        [Parameter("R:R Ratio (Short)", DefaultValue = 8.25, MinValue = 0.5, MaxValue = 15, Step = 0.25, Group = "2. Strategy")] 
-        public double RRRatioShort { get; set; }
 
         public enum TpMode { Fixed, TrailingOnly, PivotPoints, SessionExtrema }
         [Parameter("Primary TP Mode", DefaultValue = TpMode.Fixed, Group = "2. Strategy")] 
         public TpMode SelectedTpMode { get; set; }
+        [Parameter("R:R Ratio (Long)", DefaultValue = 9.75, MinValue = 0.5, MaxValue = 15, Step = 0.25, Group = "2. Strategy")] 
+        public double RRRatioLong { get; set; }
+        [Parameter("R:R Ratio (Short)", DefaultValue = 8.25, MinValue = 0.5, MaxValue = 15, Step = 0.25, Group = "2. Strategy")] 
+        public double RRRatioShort { get; set; }
         [Parameter("Pivot Level (1-3)", DefaultValue = 2, MinValue = 0.5, MaxValue = 8, Step = 0.5, Group = "2. Strategy")] 
         public double PivotLevel { get; set; }
         [Parameter("Extrema Lookback (Days)", DefaultValue = 3, MinValue = 1, MaxValue = 26, Group = "2. Strategy")] 
