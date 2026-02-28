@@ -51,6 +51,8 @@ namespace cAlgo.Robots
         public int ExtremaLookbackDays { get; set; }
         [Parameter("Enable Wolfe Override", DefaultValue = true, Group = "2. Strategy")] 
         public bool UseWolfeOverride { get; set; }
+        [Parameter("Rejection Override RR Base", DefaultValue = 3, MinValue = 0.5, MaxValue = 5, Step = 0.25, Group = "2. Strategy")]
+        public double RejectionRR { get; set; }
 
         // --- 3. Filter Settings ---
         [Parameter("MA Lookback", DefaultValue = 150, MinValue = 2, MaxValue = 500, Group = "3. Filter Settings")] 
@@ -229,7 +231,7 @@ namespace cAlgo.Robots
                     Print("ERROR: TP Mode is not set to Pivot Points. Stopping bot to save CPU cycles. Set Pivot Level back to 2.");
                     Stop();
                 }
-                else if(SelectedTpMode != TpMode.SessionExtrema && ExtremaLookbackDays != 6)
+                else if(SelectedTpMode != TpMode.SessionExtrema && ExtremaLookbackDays != 3)
                 {
                     Print("ERROR: TP Mode is not set to Session Extrema. Stopping bot to save CPU cycles. Reset Extrema Lookback to 6.");
                     Stop();
@@ -402,15 +404,15 @@ namespace cAlgo.Robots
 
                 bool shouldClose = false;
 
-                if (profitAmount >= riskAmount * 9)
+                if (profitAmount >= riskAmount * RejectionRR * 3)
                 {
                     if (rejMajor) shouldClose = true;
                 }
-                else if (profitAmount >= riskAmount * 6)
+                else if (profitAmount >= riskAmount * RejectionRR * 2)
                 {
                     if (rejMajor || rejMid) shouldClose = true;
                 }
-                else if (profitAmount >= riskAmount * 3)
+                else if (profitAmount >= riskAmount * RejectionRR)
                 {
                     if (rejMajor || rejMid || rejMinor) shouldClose = true;
                 }
