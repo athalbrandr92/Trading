@@ -10,7 +10,7 @@ namespace cAlgo.Indicators
     // 1. DEFINITIONS FOR THE BOT TO READ
     // ==========================================
     public enum ZoneTier { Minor, Mid, Major }
-    public enum ZoneType { AsianHigh, AsianLow, LondonHigh, LondonLow, NyHigh, NyLow, DoubleTop, DoubleBottom, Consolidation, MultidayHigh, MultidayLow, DailyHigh, DailyLow, PsychLevel, OrderBlock }
+    public enum ZoneType { AsianHigh, AsianLow, LondonHigh, LondonLow, NyHigh, NyLow, DoubleTop, DoubleBottom, Consolidation, MultidayHigh, MultidayLow, DailyHigh, DailyLow, PsychLevel, OrderBlock, Rejection }
     public enum RejectionMode { WickInsideCloseOutside, PrevCloseInsideCurrCloseOutside }
 
     public class Zone
@@ -52,6 +52,9 @@ namespace cAlgo.Indicators
 
         [Parameter("Show Consolidation Zones", DefaultValue = true, Group = "Visibility Toggles")]
         public bool ShowConsolidation { get; set; }
+
+        [Parameter("Show Rejection Formations", DefaultValue = true, Group = "Visibility Toggles")]
+        public bool ShowRejections { get; set; }
 
         [Output("Dummy Signal", LineColor = "Transparent")]
         public IndicatorDataSeries DummySignal { get; set; }
@@ -187,6 +190,20 @@ namespace cAlgo.Indicators
         private List<ChartFormation> _activeConsolidations = new List<ChartFormation>();
         private int _consolidationCounter = 0;
 
+        public class RejectionFormation
+        {
+            public double Top { get; set; }
+            public double Bottom { get; set; }
+            public int StartIndex { get; set; }
+            public string Name { get; set; }
+            public ZoneTier Tier { get; set; }
+        }
+
+        private List<RejectionFormation> _activeRejections = new List<RejectionFormation>();
+        private int _rejectionCounter = 0;
+
+        private int formationCheck; 
+
         protected override void Initialize()
         {
             _atr = Indicators.AverageTrueRange(14, MovingAverageType.Simple);
@@ -200,59 +217,46 @@ namespace cAlgo.Indicators
             {
                 _dailyBars = MarketData.GetBars(TimeFrame.Daily);
             }
+
+            formationCheck = Math.Min(5, MinFormationCandles);
         }
 
         public override void Calculate(int index)
         {
             DummySignal[index] = 0;
 
-            if (index == _lastProcessedIndex)
-                return;
-
+            if (index == _lastProcessedIndex) return;
             _lastProcessedIndex = index;
 
-            if(ShowMultiday)
-            {
-                CalculateMultiday();
-                if(_multidayZone.High != -1 && _multidayZone.Low != -1)
-                    DrawMultiday();
-            }
-            
-            if(ShowPreviousDay)
-            {
-                CalculateDaily();
-                if(_dailyZone.High != -1 && _dailyZone.Low != -1)
-                    DrawDaily();
-            }
-
+            // 1. Core Session Math (Fast)
             if(ShowAsianSession || ShowLondonSession || ShowNySession)
-            {
                 CalculateSessions();
+
+            // 2. Structural Math (Only run on new bars or specific intervals)
+            if (index % formationCheck == 0) 
+            {
+                if(ShowMultiday) CalculateMultiday();
+                if(ShowPreviousDay) CalculateDaily();
+                if(ShowPsychLevels) CalculatePsychLevels();
+        
+                // 3. Heavy Pattern Scanning
+                if(ShowOrderBlocks) ScanOrderBlocks();
+                if(ShowDoubleTopsBottoms) ScanDoubles();
+                if(ShowConsolidation) ScanConsolidations();
+                if(ShowRejections) ScanRejections();
+            }
+
+            // 4. DRAWING (Skip entirely if optimizing)
+            if (!IsBacktesting) 
+            {
+                if(ShowMultiday) DrawMultiday();
+                if(ShowPreviousDay) DrawDaily();
                 DrawSessions();
-            }
-
-            if(ShowPsychLevels)
-            {
-                CalculatePsychLevels();
-                DrawPsychLevels();
-            }
-
-            if(ShowOrderBlocks)
-            {
-                ScanOrderBlocks();
-                DrawOrderBlocks();
-            }
-
-            if(ShowDoubleTopsBottoms)
-            {
-                if(ScanDoubles())
-                    DrawDoubles();
-            }
-
-            if(ShowConsolidation)
-            {
-                ScanConsolidations();
-                DrawConsolidations();
+                if(ShowPsychLevels) DrawPsychLevels();
+                if(ShowOrderBlocks) DrawOrderBlocks();
+                if(ShowDoubleTopsBottoms) DrawDoubles();
+                if(ShowConsolidation) DrawConsolidations();
+                if(ShowRejections) DrawRejections();
             }
         }
 
@@ -260,6 +264,9 @@ namespace cAlgo.Indicators
         {
             DateTime currentTime = Bars.OpenTimes[_lastProcessedIndex];
             int mtfIndex = _multidayBars.OpenTimes.GetIndexByTime(currentTime);
+    
+            // ONLY run the heavy math if we have moved to a NEW MTF bar
+            if(mtfIndex == priorMtfIndex) return;
             
             if(mtfIndex != priorMtfIndex)
             {
@@ -707,75 +714,71 @@ namespace cAlgo.Indicators
 
         private void ScanOrderBlocks()
         {
+            // 1. CLEANUP (Only manage chart objects if not backtesting)
             for (int i = _activeOrderBlocks.Count - 1; i >= 0; i--)
             {
                 var ob = _activeOrderBlocks[i];
                 double currentClose = Bars.ClosePrices[_lastProcessedIndex];
 
-                if (ob.IsBullish && currentClose < ob.Bottom)
-                {
-                    Chart.RemoveObject(ob.Name);
-                    _activeOrderBlocks.RemoveAt(i);
-                }
-                else if (!ob.IsBullish && currentClose > ob.Top)
-                {
-                    Chart.RemoveObject(ob.Name);
+                bool broken = (ob.IsBullish && currentClose < ob.Bottom) || (!ob.IsBullish && currentClose > ob.Top);
+        
+                if (broken)
+                {       
+                    if (!IsBacktesting) Chart.RemoveObject(ob.Name);
                     _activeOrderBlocks.RemoveAt(i);
                 }
             }
 
             int index = _lastProcessedIndex - 1;
-            if (index < 1 || double.IsNaN(_atr.Result[index])) return;
+            if (index < 3 || double.IsNaN(_atr.Result[index])) return;
 
             double open = Bars.OpenPrices[index];
             double close = Bars.ClosePrices[index];
             double bodySize = Math.Abs(close - open);
-    
+
+            // Only look for a new OB if we have an impulse candle (1.5x ATR)
             if (bodySize > (_atr.Result[index] * 1.5))
             {
                 bool isBullishImpulse = close > open;
+                int traceIndex = -1;
 
-                for (int i = 1; i <= 3; i++)
+                // 2. UNROLLED LOOP (Direct checks for the 3 preceding candles)
+                // We look for the "Opposite" candle that preceded the impulse
+                if (isBullishImpulse)
                 {
-                    int traceIndex = index - i;
-                    if (traceIndex < 0) break;
-
-                    double traceOpen = Bars.OpenPrices[traceIndex];
-                    double traceClose = Bars.ClosePrices[traceIndex];
-
-                    if (isBullishImpulse && traceClose < traceOpen)
-                    {
-                        _obCounter++;
-                        _activeOrderBlocks.Add(new OrderBlock
-                        {
-                            Top = Bars.HighPrices[traceIndex],
-                            Bottom = Bars.LowPrices[traceIndex],
-                            StartIndex = traceIndex,
-                            IsBullish = true,
-                            Name = "OB_Bull_" + _obCounter
-                        });
-
-                        // --- Update Dictionary for Bot ---
-                        ActiveZonesDict[ZoneType.OrderBlock] = new Zone { Top = Bars.HighPrices[traceIndex], Bottom = Bars.LowPrices[traceIndex], Tier = ZoneTier.Mid };
-                        break; 
-                    }
-                    else if (!isBullishImpulse && traceClose > traceOpen)
-                    {
-                        _obCounter++;
-                        _activeOrderBlocks.Add(new OrderBlock
-                        {
-                            Top = Bars.HighPrices[traceIndex],
-                            Bottom = Bars.LowPrices[traceIndex],
-                            StartIndex = traceIndex,
-                            IsBullish = false,
-                            Name = "OB_Bear_" + _obCounter
-                        });
-
-                        // --- Update Dictionary for Bot ---
-                        ActiveZonesDict[ZoneType.OrderBlock] = new Zone { Top = Bars.HighPrices[traceIndex], Bottom = Bars.LowPrices[traceIndex], Tier = ZoneTier.Mid };
-                        break;
-                    }
+                    if (Bars.ClosePrices[index - 1] < Bars.OpenPrices[index - 1]) traceIndex = index - 1;
+                    else if (Bars.ClosePrices[index - 2] < Bars.OpenPrices[index - 2]) traceIndex = index - 2;
+                    else if (Bars.ClosePrices[index - 3] < Bars.OpenPrices[index - 3]) traceIndex = index - 3;
                 }
+                else // Bearish Impulse
+                {
+                    if (Bars.ClosePrices[index - 1] > Bars.OpenPrices[index - 1]) traceIndex = index - 1;
+                    else if (Bars.ClosePrices[index - 2] > Bars.OpenPrices[index - 2]) traceIndex = index - 2;
+                    else if (Bars.ClosePrices[index - 3] > Bars.OpenPrices[index - 3]) traceIndex = index - 3;
+                }
+
+                // 3. ADD THE ZONE IF FOUND
+                if (traceIndex != -1)
+                {
+                    _obCounter++;
+                    string obName = (isBullishImpulse ? "OB_Bull_" : "OB_Bear_") + _obCounter;
+            
+                    _activeOrderBlocks.Add(new OrderBlock
+                    {
+                        Top = Bars.HighPrices[traceIndex],
+                        Bottom = Bars.LowPrices[traceIndex],
+                        StartIndex = traceIndex,
+                        IsBullish = isBullishImpulse,
+                        Name = obName
+                    });
+
+                    ActiveZonesDict[ZoneType.OrderBlock] = new Zone 
+                    { 
+                        Top = Bars.HighPrices[traceIndex], 
+                        Bottom = Bars.LowPrices[traceIndex], 
+                        Tier = ZoneTier.Mid 
+                    };
+                }   
             }
         }
 
@@ -825,7 +828,7 @@ namespace cAlgo.Indicators
                 double pastBodyMin = Math.Min(Bars.OpenPrices[pastIndex], Bars.ClosePrices[pastIndex]);
 
                 // ==========================================
-                // DOUBLE TOP LOGIC
+                // OPTIMIZED DOUBLE TOP LOGIC
                 // ==========================================
                 double topWickSize = pastHigh - pastBodyMax;
                 double zoneMaxTop = pastHigh + topWickSize;
@@ -833,13 +836,11 @@ namespace cAlgo.Indicators
 
                 if (currentHigh >= zoneMinTop && currentHigh <= zoneMaxTop)
                 {
-                    double lowestBetween = double.MaxValue;
-                    for (int j = 1; j < i; j++)
-                    {
-                        if (Bars.LowPrices[index - j] < lowestBetween)
-                            lowestBetween = Bars.LowPrices[index - j];
-                    }
+                    // REPLACEMENT FOR YOUR NESTED LOOP:
+                    // This one line replaces the "for (int j = 1; j < i; j++)" block
+                    double lowestBetween = Bars.LowPrices.Minimum(i); 
 
+                    // We use a simple ATR-based distance check to ensure it's a "V" shape
                     if (currentHigh - lowestBetween > microAtrBuffer * 2) 
                     {
                         _doubleCounter++;
@@ -851,9 +852,7 @@ namespace cAlgo.Indicators
                             Name = "DoubleTop_" + _doubleCounter
                         });
 
-                        // --- Update Dictionary for Bot ---
                         ActiveZonesDict[ZoneType.DoubleTop] = new Zone { Top = zoneMaxTop, Bottom = zoneMinTop, Tier = ZoneTier.Minor };
-                        
                         newFormationAdded = true;
                         break;
                     }
@@ -868,12 +867,7 @@ namespace cAlgo.Indicators
 
                 if (currentLow <= zoneMaxBottom && currentLow >= zoneMinBottom)
                 {
-                    double highestBetween = double.MinValue;
-                    for (int j = 1; j < i; j++)
-                    {
-                        if (Bars.HighPrices[index - j] > highestBetween)
-                            highestBetween = Bars.HighPrices[index - j];
-                    }
+                    double highestBetween = Bars.LowPrices.Maximum(i);
 
                     if (highestBetween - currentLow > microAtrBuffer * 2) 
                     {
@@ -939,12 +933,9 @@ namespace cAlgo.Indicators
             double highestHigh = double.MinValue;
             double lowestLow = double.MaxValue;
 
-            for (int i = 0; i < MinFormationCandles; i++)
-            {
-                int pastIndex = index - i;
-                if (Bars.HighPrices[pastIndex] > highestHigh) highestHigh = Bars.HighPrices[pastIndex];
-                if (Bars.LowPrices[pastIndex] < lowestLow) lowestLow = Bars.LowPrices[pastIndex];
-            }
+            // Instant lookup of the range extrema
+            highestHigh = Bars.HighPrices.Maximum(MinFormationCandles);
+            lowestLow = Bars.LowPrices.Minimum(MinFormationCandles);
 
             if ((highestHigh - lowestLow) <= maxZoneHeight)
             {
@@ -969,6 +960,121 @@ namespace cAlgo.Indicators
             foreach (var zone in _activeConsolidations)
             {
                 var box = Chart.DrawRectangle(zone.Name, zone.StartIndex, zone.Top, _lastProcessedIndex + 3, zone.Bottom, formationColor);
+                box.IsFilled = true;
+            }
+        }
+
+        private void ScanRejections()
+        {
+            int index = _lastProcessedIndex - 1;
+            if (index < 2 || double.IsNaN(_atr.Result[index])) return;
+
+            // 1. HIGH-SPEED CLEANUP
+            // We only touch the Chart object if we are NOT in the backtester
+            for (int i = _activeRejections.Count - 1; i >= 0; i--)
+            {
+                var rej = _activeRejections[i];
+                double currentClose = Bars.ClosePrices[_lastProcessedIndex]; 
+
+                if (currentClose > rej.Top || currentClose < rej.Bottom)
+                {
+                    if (!IsBacktesting) Chart.RemoveObject(rej.Name);
+                    _activeRejections.RemoveAt(i);
+                }
+            }
+
+            // 2. STREAMLINED UPGRADES
+            // Instead of looping, we check the list specifically for the last few bars
+            for (int i = 0; i < _activeRejections.Count; i++)
+            {
+                var rej = _activeRejections[i];
+
+                // Check if the rejection from 1 bar ago needs a Mid-Tier upgrade
+                if (rej.Tier == ZoneTier.Minor && rej.StartIndex == index - 1)
+                {
+                    if (Bars.ClosePrices[index] > Bars.HighPrices[index - 1] || Bars.ClosePrices[index] < Bars.LowPrices[index - 1])
+                    {
+                        rej.Tier = ZoneTier.Mid;
+                        ActiveZonesDict[ZoneType.Rejection] = new Zone { Top = rej.Top, Bottom = rej.Bottom, Tier = ZoneTier.Mid };
+                    }
+                }
+                // Check if the rejection from 2 bars ago needs a Major-Tier upgrade
+                else if (rej.Tier == ZoneTier.Mid && rej.StartIndex == index - 2)
+                {
+                    if (Bars.ClosePrices[index] > Bars.HighPrices[index - 1] || Bars.ClosePrices[index] < Bars.LowPrices[index - 1])
+                    {
+                        rej.Tier = ZoneTier.Major;
+                        ActiveZonesDict[ZoneType.Rejection] = new Zone { Top = rej.Top, Bottom = rej.Bottom, Tier = ZoneTier.Major };
+                    }
+                }
+            }
+
+            // 3. FASTER PATTERN DETECTION
+            double open = Bars.OpenPrices[index];
+            double close = Bars.ClosePrices[index];
+            double high = Bars.HighPrices[index];
+            double low = Bars.LowPrices[index];
+
+            double body = Math.Abs(close - open);
+            double totalRange = high - low;
+            double lowerWick = Math.Min(open, close) - low;
+            double upperWick = high - Math.Max(open, close);
+
+            // Optimized boolean logic
+            bool isBullishRejection = lowerWick >= (body * 2) && lowerWick >= (totalRange * 0.5);
+            bool isBearishRejection = upperWick >= (body * 2) && upperWick >= (totalRange * 0.5);
+
+            if (isBullishRejection || isBearishRejection)
+            {
+                // Simple check: is this bar already a rejection?
+                bool exists = false;
+                if (_activeRejections.Count > 0 && _activeRejections[_activeRejections.Count - 1].StartIndex == index)
+                    exists = true;
+
+                if (!exists)
+                {
+                    _rejectionCounter++;
+                    double microAtr = _atr.Result[index] * MicroAtrMultiplier;
+                    double top, bottom;
+
+                    if (isBullishRejection)
+                    {
+                        bottom = low - microAtr;
+                        top = close + lowerWick + microAtr;
+                    }
+                    else
+                    {
+                        top = high + microAtr;
+                        bottom = close - upperWick - microAtr;
+                    }
+
+                    _activeRejections.Add(new RejectionFormation
+                    {
+                        Top = top,
+                        Bottom = bottom,
+                        StartIndex = index,
+                        Name = "Rejection_" + _rejectionCounter,
+                        Tier = ZoneTier.Minor
+                    });
+
+                    ActiveZonesDict[ZoneType.Rejection] = new Zone { Top = top, Bottom = bottom, Tier = ZoneTier.Minor };
+                }
+            }
+        }
+
+        private void DrawRejections()
+        {
+            Color minorColor = Color.FromArgb(70, Color.Blue);
+            Color midColor = Color.FromArgb(120, Color.Blue);
+            Color majorColor = Color.FromArgb(180, Color.Blue);
+
+            foreach (var rej in _activeRejections)
+            {
+                Color drawColor = minorColor;
+                if (rej.Tier == ZoneTier.Mid) drawColor = midColor;
+                else if (rej.Tier == ZoneTier.Major) drawColor = majorColor;
+
+                var box = Chart.DrawRectangle(rej.Name, rej.StartIndex, rej.Top, _lastProcessedIndex + 3, rej.Bottom, drawColor);
                 box.IsFilled = true;
             }
         }
@@ -1039,6 +1145,9 @@ namespace cAlgo.Indicators
 
             var consolidation = GetClosestZone(new[] { ZoneType.Consolidation }, currClose);
             if (consolidation != null) closestZonesToTest.Add(consolidation);
+
+            var rejectionFormation = GetClosestZone(new[] { ZoneType.Rejection }, currClose);
+            if (rejectionFormation != null) closestZonesToTest.Add(rejectionFormation);
 
             foreach (var zone in closestZonesToTest)
             {

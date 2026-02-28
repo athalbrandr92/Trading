@@ -315,13 +315,12 @@ namespace cAlgo.Robots
                 IndMinFormationCandles, IndMaxLookbackCandles, IndMaxConsolidationAtrWidth
             );
 
-            InitializeHistoricalRange();
-
             _m1Bars = MarketData.GetBars(TimeFrame.Minute);
             _m1Bars.BarOpened += OnM1BarOpened;
 
             // 0 = Standard, 1 = HighLow, 2 = Reverse
             rsiMode = RSIHiLo ? 1 : (RSIReverse ? 2 : 0);
+            InitializeHistoricalRange();
         }
 
         private void InitializeHistoricalRange()
@@ -378,7 +377,7 @@ namespace cAlgo.Robots
 
             if (EnableTrade() && Positions.Count(p => p.Label == Label) < MaxPositions)
             {
-                if (CheckAdx(_adx.ADX.Last(1)))
+                if (_adx == null || CheckAdx(_adx.ADX.Last(1)))
                     TradeIfAble();
             }
         }
