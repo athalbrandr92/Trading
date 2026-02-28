@@ -191,6 +191,10 @@ namespace cAlgo.Robots
         private string Label => $"RB_{OrderMagic}";
         private double startingBalance;
         private Bars _m1Bars;
+        private int rsiMode = -1;
+        private double currentDayHigh = -2;
+        private double currentDayLow = 2500000;
+        private double currentDayClose = -1;
 
         protected override void OnStart()
         {
@@ -287,7 +291,8 @@ namespace cAlgo.Robots
             rsi = Indicators.RelativeStrengthIndex(Bars.ClosePrices, 14);
             _atrShort = Indicators.AverageTrueRange(Bars, AtrPeriod, MovingAverageType.Exponential);
             _atrLong = Indicators.AverageTrueRange(Bars, AtrLongPeriod, MovingAverageType.Exponential);
-            _adx = Indicators.DirectionalMovementSystem(AdxPeriod);
+            if(AdxMode != AdxFilterMode.Off)
+                _adx = Indicators.DirectionalMovementSystem(AdxPeriod);
             _dailyBars = MarketData.GetBars(TimeFrame.Daily);
 
             if (SelectedTrail == TrailType.MTF_EMA)
@@ -314,10 +319,16 @@ namespace cAlgo.Robots
 
             _m1Bars = MarketData.GetBars(TimeFrame.Minute);
             _m1Bars.BarOpened += OnM1BarOpened;
+
+            // 0 = Standard, 1 = HighLow, 2 = Reverse
+            rsiMode = RSIHiLo ? 1 : (RSIReverse ? 2 : 0);
         }
 
         private void InitializeHistoricalRange()
         {
+            currentDayHigh = _dailyBars.HighPrices.Last(1);
+            currentDayClose = _dailyBars.ClosePrices.Last(1);
+            currentDayLow = _dailyBars.LowPrices.Last(1);
             for (int i = _m1Bars.Count - 1; i >= LookbackMinutes; i--)
             {
                 if (_m1Bars.OpenTimes[i].Hour == StartTime && _m1Bars.OpenTimes[i].Minute == OpenRangeMin)
@@ -345,11 +356,8 @@ namespace cAlgo.Robots
             if (SelectedTrail != TrailType.None) 
                 HandleTrailing();
 
-            if (Server.Time.Hour == StartTime && Server.Time.Minute == OpenRangeMin)
-            {
-                DefineRanges(); 
-                Print("Range Defined for {0}: High {1}, Low {2}", Label, openHigh, openLow);
-            }
+            if (Server.Time.Minute == OpenRangeMin && Server.Time.Hour == StartTime)
+                DefineRanges();
         }
 
         protected override void OnBar()
@@ -435,8 +443,25 @@ namespace cAlgo.Robots
             bool maS = MaLogic == MaModeType.PriceAboveBelow ? close < ema.Result.LastValue : ema.Result.LastValue < ema.Result.Last(1);
 
             double rsiVal = rsi.Result.Last(1);
-            bool rsiLong = (!RSIHiLo && rsiVal > RSIVal) || (RSIHiLo && rsiVal > RSIVal && rsiVal < (100 - RSIVal)) || (RSIReverse && rsiVal < RSIVal);
-            bool rsiShort = (!RSIHiLo && rsiVal < (100 - RSIVal)) || (RSIHiLo && rsiVal < (100 - RSIVal) && rsiVal > RSIVal) || (RSIReverse && rsiVal > (100 - RSIVal));
+        bool rsiLong = false;
+        bool rsiShort = false;
+
+        // Branching allows the CPU to skip irrelevant logic entirely
+        if (rsiMode == 1) // High-Low (Most common)
+        {
+            rsiLong = rsiVal > RSIVal && rsiVal < (100 - RSIVal);
+            rsiShort = rsiVal < (100 - RSIVal) && rsiVal > RSIVal;
+        }
+        else if (rsiMode == 0) // Standard
+        {
+            rsiLong = rsiVal > RSIVal;
+            rsiShort = rsiVal < (100 - RSIVal);
+        }
+        else if (rsiMode == 2) // Reverse
+        {
+            rsiLong = rsiVal < RSIVal;
+            rsiShort = rsiVal > (100 - RSIVal);
+        }
 
             bool bullSig = close > openHigh && maB && rsiLong;
             bool bearSig = close < openLow && maS && rsiShort;
@@ -491,9 +516,9 @@ namespace cAlgo.Robots
                     break;
 
                 case TpMode.PivotPoints:
-                    double h = _dailyBars.HighPrices.Last(1);
-                    double l = _dailyBars.LowPrices.Last(1);
-                    double c = _dailyBars.ClosePrices.Last(1);
+                    double h = currentDayHigh;
+                    double l = currentDayLow;
+                    double c = currentDayClose;
                     double pp = (h + l + c) / 3;
 
                     // Define Standard Levels
@@ -578,10 +603,14 @@ namespace cAlgo.Robots
         {
             if (Server.Time.Hour == StartTime && Server.Time.Minute == OpenRangeMin)
             {
-                p1Index = Bars.Count - LookbackMinutes; p1Price = Bars.OpenPrices.Last(LookbackMinutes);
-                openHigh = Bars.HighPrices.Last(1); openLow = Bars.LowPrices.Last(1);
-                for (int i = 2; i <= LookbackMinutes; i++) { openHigh = Math.Max(openHigh, Bars.HighPrices.Last(i)); openLow = Math.Min(openLow, Bars.LowPrices.Last(i)); }
-                p4Index = Bars.Count - 1; p4Price = (openHigh + openLow) / 2;
+                p1Index = _m1Bars.Count - LookbackMinutes; p1Price = _m1Bars.OpenPrices.Last(LookbackMinutes);
+                openHigh = _m1Bars.HighPrices.Last(1); openLow = _m1Bars.LowPrices.Last(1);
+                for (int i = 2; i <= LookbackMinutes; i++) { openHigh = Math.Max(openHigh, _m1Bars.HighPrices.Last(i)); openLow = Math.Min(openLow, _m1Bars.LowPrices.Last(i)); }
+                p4Index = _m1Bars.Count - 1; p4Price = (openHigh + openLow) / 2;
+
+                currentDayHigh = _dailyBars.HighPrices.Last(1);
+                currentDayClose = _dailyBars.ClosePrices.Last(1);
+                currentDayLow = _dailyBars.LowPrices.Last(1);
             }
         }
 
