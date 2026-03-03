@@ -355,11 +355,13 @@ namespace cAlgo.Robots
 
         private void TradeIfAble()
         {
-            // --- 1. DYNAMIC SPREAD LOGIC ---
+    
+            // Crypto logic: Spreads on BTC/ETH can be massive during weekend gaps.
+            // If it's crypto, we might allow a slightly more generous multiplier.
             double atrS = _atrShort.Result.Last(1);
             double atrL = _atrLong.Result.Last(1);
             double volRatio = atrS / Math.Max(0.00001, atrL);
-            double dynamicMaxSpread = Math.Truncate(MaxSpread * volRatio);
+            double dynamicMaxSpread = Math.Truncate(MaxSpread * volRatio);           
             
             if (Symbol.Spread / Symbol.PipSize > dynamicMaxSpread) return;
 
@@ -539,16 +541,55 @@ namespace cAlgo.Robots
             double mPS = (slD / Symbol.TickSize) * Symbol.TickValue * Symbol.VolumeInUnitsStep; 
             return Math.Round(Math.Clamp(Math.Floor(rM / mPS) * Symbol.VolumeInUnitsStep, Symbol.VolumeInUnitsMin, Symbol.VolumeInUnitsStep * 1000), 6);
         }
-        protected override double GetFitness(GetFitnessArgs args) { 
-            if (args.NetProfit <= 0) return args.NetProfit; 
+        
+        protected override double GetFitness(GetFitnessArgs args) 
+        { 
+            // 1. Initial Safety Checks
+            if (args.NetProfit <= 0) return args.NetProfit;
+            if (args.TotalTrades == 1) return 0; 
+
+            // 2. Detect Asset Class for Time Calculation
+            // Crypto trades 7 days; FX/Metals trade 5 days.
+            bool isCrypto = SymbolName.ToUpper().Contains("BTC") || 
+                            SymbolName.ToUpper().Contains("ETH") || 
+                            SymbolName.ToUpper().Contains("XBT");
+
+            TimeSpan duration = args.History.Last().ClosingTime - args.History.First().EntryTime;
+    
+            // Adjust the week divisor based on the asset class
+            double daysPerWeek = isCrypto ? 7.0 : 5.0;
+            double weeks = Math.Max(0.1, duration.TotalDays / daysPerWeek);
+            double tradesPerWeek = args.TotalTrades / weeks;
+    
+            // Minimum Floor: 2 trades per week.
+            double frequencyPenalty = Math.Min(1.0, tradesPerWeek / 2.0);
+            frequencyPenalty = Math.Pow(frequencyPenalty, 4); 
+
+            // 3. Core Math (R2 / Regression)
             var trades = args.History.OrderBy(t => t.ClosingTime).ToList(); 
             double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0, cum = 0; 
-            for (int i = 0; i < trades.Count; i++) { 
-                cum += trades[i].NetProfit; sumX += i; sumY += cum; sumXY += i * cum; sumX2 += i * i; sumY2 += cum * cum; 
+            for (int i = 0; i < trades.Count; i++) 
+            { 
+                cum += trades[i].NetProfit; sumX += i; sumY += cum; 
+                sumXY += i * cum; sumX2 += i * i; sumY2 += cum * cum; 
             } 
-            double r2 = Math.Pow(((trades.Count * sumXY) - (sumX * sumY)) / Math.Sqrt(((trades.Count * sumX2) - (sumX * sumX)) * ((trades.Count * sumY2) - (sumY * sumY))), 2); 
-            if(args.MaxEquityDrawdownPercentages >= 10) return ((((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2) / args.MaxEquityDrawdownPercentages;
-            return (((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2;
+
+            double denominator = Math.Sqrt(((trades.Count * sumX2) - (sumX * sumX)) * ((trades.Count * sumY2) - (sumY * sumY)));
+            double r2 = (denominator == 0) ? 0 : Math.Pow(((trades.Count * sumXY) - (sumX * sumY)) / denominator, 2); 
+
+            // 4. Base Score Calculation (Incorporating your DD logic)
+            double baseScore;
+            if (args.MaxEquityDrawdownPercentages >= 10) 
+            {
+                baseScore = ((((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2) / args.MaxEquityDrawdownPercentages;
+            }
+            else 
+            {
+                baseScore = (((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2;
+            }
+
+            // 5. Apply Penalty
+            return baseScore * frequencyPenalty;
         }
     }
 }
