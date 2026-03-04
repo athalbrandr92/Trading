@@ -6,9 +6,6 @@ using cAlgo.API.Indicators;
 
 namespace cAlgo.Indicators
 {
-    // ==========================================
-    // 1. DEFINITIONS FOR THE BOT TO READ
-    // ==========================================
     public enum ZoneTier { Minor, Mid, Major }
     public enum ZoneType { AsianHigh, AsianLow, LondonHigh, LondonLow, NyHigh, NyLow, DoubleTop, DoubleBottom, Consolidation, MultidayHigh, MultidayLow, DailyHigh, DailyLow, PsychLevel, OrderBlock, Rejection }
     public enum RejectionMode { WickInsideCloseOutside, PrevCloseInsideCurrCloseOutside }
@@ -41,8 +38,15 @@ namespace cAlgo.Indicators
         [Parameter("Show NY Session", DefaultValue = true, Group = "Visibility Toggles")]
         public bool ShowNySession { get; set; }
 
-        [Parameter("Show Psych Levels", DefaultValue = true, Group = "Visibility Toggles")]
-        public bool ShowPsychLevels { get; set; }
+        // --- UPDATED PSYCH TOGGLES ---
+        [Parameter("Show Psych Centuries (.00 / .000)", DefaultValue = true, Group = "Visibility Toggles")]
+        public bool ShowPsychCenturies { get; set; }
+
+        [Parameter("Show Psych Halves (.50 / .050)", DefaultValue = true, Group = "Visibility Toggles")]
+        public bool ShowPsychHalves { get; set; }
+
+        [Parameter("Show Psych Quartiles (.25 / .025)", DefaultValue = true, Group = "Visibility Toggles")]
+        public bool ShowPsychQuartiles { get; set; }
 
         [Parameter("Show Order Blocks", DefaultValue = true, Group = "Visibility Toggles")]
         public bool ShowOrderBlocks { get; set; } 
@@ -144,12 +148,8 @@ namespace cAlgo.Indicators
         private double _nearestPsychCenturyAbove;
         private double _nearestPsychCenturyBelow;
 
-        // THE DICTIONARY FOR THE BOT
         public Dictionary<ZoneType, Zone> ActiveZonesDict = new Dictionary<ZoneType, Zone>();
 
-        // ==========================================
-        // DATA STRUCTURES
-        // ==========================================
         public class PriceZone
         {
             public double High { get; set; }
@@ -209,21 +209,27 @@ namespace cAlgo.Indicators
             _atr = Indicators.AverageTrueRange(14, MovingAverageType.Simple);
 
             if (ShowMultiday)
-            {
                 _multidayBars = MarketData.GetBars(MultidayTimeFrame);
-            }
 
             if (ShowPreviousDay)
-            {
                 _dailyBars = MarketData.GetBars(TimeFrame.Daily);
-            }
 
             formationCheck = Math.Min(5, MinFormationCandles);
         }
 
         public override void Calculate(int index)
         {
-            DummySignal[index] = 0;
+            // Fix for the "Squashed Chart" scaling issue:
+            // We set the dummy value to the previous bar's median price so the scale remains tight.
+            if (index > 0)
+            {
+                DummySignal[index] = (Bars.HighPrices[index - 1] + Bars.LowPrices[index - 1] + 
+                                      Bars.OpenPrices[index - 1] + Bars.ClosePrices[index - 1]) / 4;
+            }
+            else
+            {
+                DummySignal[index] = Bars.ClosePrices[index];
+            }
 
             if (index == _lastProcessedIndex) return;
             _lastProcessedIndex = index;
@@ -232,27 +238,29 @@ namespace cAlgo.Indicators
             if(ShowAsianSession || ShowLondonSession || ShowNySession)
                 CalculateSessions();
 
-            // 2. Structural Math (Only run on new bars or specific intervals)
+            // 2. Structural Math
             if (index % formationCheck == 0) 
             {
                 if(ShowMultiday) CalculateMultiday();
                 if(ShowPreviousDay) CalculateDaily();
-                if(ShowPsychLevels) CalculatePsychLevels();
         
-                // 3. Heavy Pattern Scanning
+                // Ensure psych math runs if any of the three toggles are on
+                if(ShowPsychCenturies || ShowPsychHalves || ShowPsychQuartiles) 
+                    CalculatePsychLevels();
+        
                 if(ShowOrderBlocks) ScanOrderBlocks();
                 if(ShowDoubleTopsBottoms) ScanDoubles();
                 if(ShowConsolidation) ScanConsolidations();
                 if(ShowRejections) ScanRejections();
             }
 
-            // 4. DRAWING (Skip entirely if optimizing)
+            // 3. DRAWING
             if (!IsBacktesting) 
             {
                 if(ShowMultiday) DrawMultiday();
                 if(ShowPreviousDay) DrawDaily();
                 DrawSessions();
-                if(ShowPsychLevels) DrawPsychLevels();
+                DrawPsychLevels();
                 if(ShowOrderBlocks) DrawOrderBlocks();
                 if(ShowDoubleTopsBottoms) DrawDoubles();
                 if(ShowConsolidation) DrawConsolidations();
@@ -265,7 +273,6 @@ namespace cAlgo.Indicators
             DateTime currentTime = Bars.OpenTimes[_lastProcessedIndex];
             int mtfIndex = _multidayBars.OpenTimes.GetIndexByTime(currentTime);
     
-            // ONLY run the heavy math if we have moved to a NEW MTF bar
             if(mtfIndex == priorMtfIndex) return;
             
             if(mtfIndex != priorMtfIndex)
@@ -298,13 +305,10 @@ namespace cAlgo.Indicators
             if (ShowNySession) maxSessionAtr = Math.Max(maxSessionAtr, _nyZone.AverageAtr);
 
             if (maxSessionAtr == 0 || double.IsNaN(maxSessionAtr))
-            {
                 maxSessionAtr = _atr.Result[_lastProcessedIndex];
-            }   
 
             _multidayZone.AverageAtr = maxSessionAtr;
 
-            // --- Update Dictionary for Bot ---
             double atrBuffer = _multidayZone.AverageAtr * MacroAtrMultiplier;
             ActiveZonesDict[ZoneType.MultidayHigh] = new Zone { Top = _multidayZone.High + atrBuffer, Bottom = _multidayZone.High - atrBuffer, Tier = ZoneTier.Major };
             ActiveZonesDict[ZoneType.MultidayLow] = new Zone { Top = _multidayZone.Low + atrBuffer, Bottom = _multidayZone.Low - atrBuffer, Tier = ZoneTier.Major };
@@ -354,13 +358,10 @@ namespace cAlgo.Indicators
             if (ShowNySession) maxSessionAtr = Math.Max(maxSessionAtr, _nyZone.AverageAtr);
 
             if (maxSessionAtr == 0 || double.IsNaN(maxSessionAtr))
-            {
                 maxSessionAtr = _atr.Result[_lastProcessedIndex];
-            }   
 
             _dailyZone.AverageAtr = maxSessionAtr;
 
-            // --- Update Dictionary for Bot ---
             double atrBuffer = _dailyZone.AverageAtr * MacroAtrMultiplier;
             ActiveZonesDict[ZoneType.DailyHigh] = new Zone { Top = _dailyZone.High + atrBuffer, Bottom = _dailyZone.High - atrBuffer, Tier = ZoneTier.Mid };
             ActiveZonesDict[ZoneType.DailyLow] = new Zone { Top = _dailyZone.Low + atrBuffer, Bottom = _dailyZone.Low - atrBuffer, Tier = ZoneTier.Mid };
@@ -392,9 +393,6 @@ namespace cAlgo.Indicators
             DateTime candleTime = Bars.OpenTimes[_lastProcessedIndex].AddHours(UtcOffset);
             int currentHour = candleTime.Hour;
 
-            // ==========================================
-            // ASIAN SESSION LOGIC
-            // ==========================================
             if(ShowAsianSession)
             {
                 bool isAsianSession = false;
@@ -417,10 +415,8 @@ namespace cAlgo.Indicators
                     double currentHigh = Bars.HighPrices[_lastProcessedIndex];
                     double currentLow = Bars.LowPrices[_lastProcessedIndex];
 
-                    if (currentHigh > _tempAsianHigh) 
-                        _tempAsianHigh = currentHigh;
-                    if (currentLow < _tempAsianLow) 
-                        _tempAsianLow = currentLow;
+                    if (currentHigh > _tempAsianHigh) _tempAsianHigh = currentHigh;
+                    if (currentLow < _tempAsianLow) _tempAsianLow = currentLow;
 
                     if(!double.IsNaN(_atr.Result[_lastProcessedIndex]))
                     {
@@ -438,7 +434,6 @@ namespace cAlgo.Indicators
                         _asianZone.AverageAtr = _tempAsianAtrSum / _tempAsianCandleCount;
                         _asianZone.StartIndex = _lastProcessedIndex; 
 
-                        // --- Update Dictionary for Bot ---
                         double atrBuffer = _asianZone.AverageAtr * MacroAtrMultiplier;
                         ActiveZonesDict[ZoneType.AsianHigh] = new Zone { Top = _asianZone.High + atrBuffer, Bottom = _asianZone.High - atrBuffer, Tier = ZoneTier.Minor };
                         ActiveZonesDict[ZoneType.AsianLow] = new Zone { Top = _asianZone.Low + atrBuffer, Bottom = _asianZone.Low - atrBuffer, Tier = ZoneTier.Minor };
@@ -446,9 +441,6 @@ namespace cAlgo.Indicators
                 }
             }
     
-            // ==========================================
-            // London SESSION LOGIC
-            // ==========================================
             if(ShowLondonSession)
             {
                 bool isLondonSession = false;
@@ -471,10 +463,8 @@ namespace cAlgo.Indicators
                     double currentHigh = Bars.HighPrices[_lastProcessedIndex];
                     double currentLow = Bars.LowPrices[_lastProcessedIndex];
 
-                    if (currentHigh > _tempLondonHigh) 
-                        _tempLondonHigh = currentHigh;
-                    if (currentLow < _tempLondonLow) 
-                        _tempLondonLow = currentLow;
+                    if (currentHigh > _tempLondonHigh) _tempLondonHigh = currentHigh;
+                    if (currentLow < _tempLondonLow) _tempLondonLow = currentLow;
 
                     _tempLondonAtrSum += _atr.Result[_lastProcessedIndex];
                     _tempLondonCandleCount++;
@@ -489,7 +479,6 @@ namespace cAlgo.Indicators
                         _londonZone.StartIndex = _lastProcessedIndex;
                         _londonZone.AverageAtr = _tempLondonAtrSum / _tempLondonCandleCount; 
 
-                        // --- Update Dictionary for Bot ---
                         double atrBuffer = _londonZone.AverageAtr * MacroAtrMultiplier;
                         ActiveZonesDict[ZoneType.LondonHigh] = new Zone { Top = _londonZone.High + atrBuffer, Bottom = _londonZone.High - atrBuffer, Tier = ZoneTier.Minor };
                         ActiveZonesDict[ZoneType.LondonLow] = new Zone { Top = _londonZone.Low + atrBuffer, Bottom = _londonZone.Low - atrBuffer, Tier = ZoneTier.Minor };
@@ -497,9 +486,6 @@ namespace cAlgo.Indicators
                 }
             }
 
-            // ==========================================
-            // NEW YORK SESSION LOGIC
-            // ==========================================
             if(ShowNySession)
             {
                 bool isNYSession = false;
@@ -522,10 +508,8 @@ namespace cAlgo.Indicators
                     double currentHigh = Bars.HighPrices[_lastProcessedIndex];
                     double currentLow = Bars.LowPrices[_lastProcessedIndex];
 
-                    if (currentHigh > _tempNYHigh) 
-                        _tempNYHigh = currentHigh;
-                    if (currentLow < _tempNYLow) 
-                        _tempNYLow = currentLow;
+                    if (currentHigh > _tempNYHigh) _tempNYHigh = currentHigh;
+                    if (currentLow < _tempNYLow) _tempNYLow = currentLow;
 
                     _tempNYAtrSum += _atr.Result[_lastProcessedIndex];
                     _tempNYCandleCount++;
@@ -540,7 +524,6 @@ namespace cAlgo.Indicators
                         _nyZone.StartIndex = _lastProcessedIndex;
                         _nyZone.AverageAtr = _tempNYAtrSum / _tempNYCandleCount;
 
-                        // --- Update Dictionary for Bot ---
                         double atrBuffer = _nyZone.AverageAtr * MacroAtrMultiplier;
                         ActiveZonesDict[ZoneType.NyHigh] = new Zone { Top = _nyZone.High + atrBuffer, Bottom = _nyZone.High - atrBuffer, Tier = ZoneTier.Minor };
                         ActiveZonesDict[ZoneType.NyLow] = new Zone { Top = _nyZone.Low + atrBuffer, Bottom = _nyZone.Low - atrBuffer, Tier = ZoneTier.Minor };
@@ -554,20 +537,20 @@ namespace cAlgo.Indicators
             if (double.IsNaN(_atr.Result[_lastProcessedIndex])) return;
 
             double AsianAtrBuffer = _asianZone.AverageAtr * MacroAtrMultiplier;
-            double asianHighTop = _asianZone.High + AsianAtrBuffer;
-            double asianHighBottom = _asianZone.High - AsianAtrBuffer;
-            double asianLowTop = _asianZone.Low + AsianAtrBuffer;
-            double asianLowBottom = _asianZone.Low - AsianAtrBuffer;
+            double AsianHighTop = _asianZone.High + AsianAtrBuffer;
+            double AsianHighBottom = _asianZone.High - AsianAtrBuffer;
+            double AsianLowTop = _asianZone.Low + AsianAtrBuffer;
+            double AsianLowBottom = _asianZone.Low - AsianAtrBuffer;
             double LondonAtrBuffer = _londonZone.AverageAtr * MacroAtrMultiplier;
-            double londonHighTop = _londonZone.High + LondonAtrBuffer;
-            double londonHighBottom = _londonZone.High - LondonAtrBuffer;
-            double londonLowTop = _londonZone.Low + LondonAtrBuffer;
-            double londonLowBottom = _londonZone.Low - LondonAtrBuffer;
+            double LondonHighTop = _londonZone.High + LondonAtrBuffer;
+            double LondonHighBottom = _londonZone.High - LondonAtrBuffer;
+            double LondonLowTop = _londonZone.Low + LondonAtrBuffer;
+            double LondonLowBottom = _londonZone.Low - LondonAtrBuffer;
             double NyAtrBuffer = _nyZone.AverageAtr * MacroAtrMultiplier;
-            double nyHighTop = _nyZone.High + NyAtrBuffer;
-            double nyHighBottom = _nyZone.High - NyAtrBuffer;
-            double nyLowTop = _nyZone.Low + NyAtrBuffer;
-            double nyLowBottom = _nyZone.Low - NyAtrBuffer;
+            double NyHighTop = _nyZone.High + NyAtrBuffer;
+            double NyHighBottom = _nyZone.High - NyAtrBuffer;
+            double NyLowTop = _nyZone.Low + NyAtrBuffer;
+            double NyLowBottom = _nyZone.Low - NyAtrBuffer;
 
             Color sessionsColor = Color.FromArgb(102, Color.Red);
 
@@ -598,39 +581,39 @@ namespace cAlgo.Indicators
             {
                 if(isAsianClosestHigh)
                 {
-                    var asianHighBox = Chart.DrawRectangle(asianHighName, _asianZone.StartIndex, asianHighTop, _lastProcessedIndex + 1, asianHighBottom, sessionsColor);
-                    asianHighBox.IsFilled = true;
+                    var box = Chart.DrawRectangle(asianHighName, _asianZone.StartIndex, AsianHighTop, _lastProcessedIndex + 1, AsianHighBottom, sessionsColor);
+                    box.IsFilled = true;
                 }
                 if(isAsianClosestLow)
                 {
-                    var asianLowBox = Chart.DrawRectangle(asianLowName, _asianZone.StartIndex, asianLowTop, _lastProcessedIndex + 1, asianLowBottom, sessionsColor);
-                    asianLowBox.IsFilled = true;
+                    var box = Chart.DrawRectangle(asianLowName, _asianZone.StartIndex, AsianLowTop, _lastProcessedIndex + 1, AsianLowBottom, sessionsColor);
+                    box.IsFilled = true;
                 }
             }
             if(ShowLondonSession && _londonZone.High != -1 && _londonZone.Low != -1)
             {
                 if(isLondonClosestHigh)
                 {
-                    var londonHighBox = Chart.DrawRectangle(londonHighName, _londonZone.StartIndex, londonHighTop, _lastProcessedIndex + 1, londonHighBottom, sessionsColor);
-                    londonHighBox.IsFilled = true;
+                    var box = Chart.DrawRectangle(londonHighName, _londonZone.StartIndex, LondonHighTop, _lastProcessedIndex + 1, LondonHighBottom, sessionsColor);
+                    box.IsFilled = true;
                 }
                 if(isLondonClosestLow)
                 {
-                    var londonLowBox = Chart.DrawRectangle(londonLowName, _londonZone.StartIndex, londonLowTop, _lastProcessedIndex + 1, londonLowBottom, sessionsColor);
-                    londonLowBox.IsFilled = true;
+                    var box = Chart.DrawRectangle(londonLowName, _londonZone.StartIndex, LondonLowTop, _lastProcessedIndex + 1, LondonLowBottom, sessionsColor);
+                    box.IsFilled = true;
                 }
             }
             if(ShowNySession && _nyZone.High != -1 && _nyZone.Low != -1)
             {   
                 if(isNyClosestHigh)
                 {
-                    var nyHighBox = Chart.DrawRectangle(nyHighName, _nyZone.StartIndex, nyHighTop, _lastProcessedIndex + 1, nyHighBottom, sessionsColor);
-                    nyHighBox.IsFilled = true;
+                    var box = Chart.DrawRectangle(nyHighName, _nyZone.StartIndex, NyHighTop, _lastProcessedIndex + 1, NyHighBottom, sessionsColor);
+                    box.IsFilled = true;
                 }
                 if(isNyClosestLow)
                 {
-                    var nyLowBox = Chart.DrawRectangle(nyLowName, _nyZone.StartIndex, nyLowTop, _lastProcessedIndex + 1, nyLowBottom, sessionsColor);
-                    nyLowBox.IsFilled = true;      
+                    var box = Chart.DrawRectangle(nyLowName, _nyZone.StartIndex, NyLowTop, _lastProcessedIndex + 1, NyLowBottom, sessionsColor);
+                    box.IsFilled = true;      
                 }
             }       
         }
@@ -649,18 +632,12 @@ namespace cAlgo.Indicators
             double halfBelow = Math.Floor(currentPrice / halfStep) * halfStep;
             double centuryBelow = Math.Floor(currentPrice / centuryStep) * centuryStep;
 
-            if (quartileAbove == currentPrice || quartileAbove == halfAbove || quartileAbove == centuryAbove) 
-                quartileAbove += PsychLevelStep;
-            if (quartileBelow == currentPrice || quartileBelow == halfBelow || quartileBelow == centuryBelow) 
-                quartileBelow -= PsychLevelStep;
-            if(halfAbove == currentPrice || halfAbove == centuryAbove)
-                halfAbove += halfStep;
-            if(halfBelow == currentPrice || halfBelow == centuryBelow)
-                halfBelow -= halfStep;
-            if(centuryAbove == currentPrice)
-                centuryAbove += centuryStep;
-            if(centuryBelow == currentPrice)
-                centuryBelow -= centuryStep;
+            if (quartileAbove == currentPrice || quartileAbove == halfAbove || quartileAbove == centuryAbove) quartileAbove += PsychLevelStep;
+            if (quartileBelow == currentPrice || quartileBelow == halfBelow || quartileBelow == centuryBelow) quartileBelow -= PsychLevelStep;
+            if(halfAbove == currentPrice || halfAbove == centuryAbove) halfAbove += halfStep;
+            if(halfBelow == currentPrice || halfBelow == centuryBelow) halfBelow -= halfStep;
+            if(centuryAbove == currentPrice) centuryAbove += centuryStep;
+            if(centuryBelow == currentPrice) centuryBelow -= centuryStep;
 
             _nearestPsychQuartileAbove = quartileAbove;
             _nearestPsychQuartileBelow = quartileBelow;
@@ -669,18 +646,43 @@ namespace cAlgo.Indicators
             _nearestPsychCenturyAbove = centuryAbove;
             _nearestPsychCenturyBelow = centuryBelow;
 
-            // --- Update Dictionary for Bot (We only pass the nearest Century and Half levels to the bot as Mid-Tier) ---
+            // --- Update Dictionary for Bot ---
             if (_dailyZone.AverageAtr != 0 && !double.IsNaN(_dailyZone.AverageAtr))
             {
                 double atrBuffer = _dailyZone.AverageAtr * MacroAtrMultiplier;
-                // For simplicity, we create a generic PsychLevel entry covering the closest major line
-                double distCentury = Math.Min(Math.Abs(currentPrice - centuryAbove), Math.Abs(currentPrice - centuryBelow));
-                double distHalf = Math.Min(Math.Abs(currentPrice - halfAbove), Math.Abs(currentPrice - halfBelow));
                 
-                double closestPsych = distCentury <= distHalf ? (Math.Abs(currentPrice - centuryAbove) <= Math.Abs(currentPrice - centuryBelow) ? centuryAbove : centuryBelow) : (Math.Abs(currentPrice - halfAbove) <= Math.Abs(currentPrice - halfBelow) ? halfAbove : halfBelow);
+                // Logic to find the closest level among ONLY the enabled categories
+                double closestLevel = -1;
+                double minDistance = double.MaxValue;
 
-                ActiveZonesDict[ZoneType.PsychLevel] = new Zone { Top = closestPsych + atrBuffer, Bottom = closestPsych - atrBuffer, Tier = ZoneTier.Mid };
+                // Priority: Century > Half > Quartile
+                if (ShowPsychCenturies)
+                {
+                    UpdateClosestPsych(currentPrice, _nearestPsychCenturyAbove, _nearestPsychCenturyBelow, ref closestLevel, ref minDistance);
+                }
+                if (ShowPsychHalves)
+                {
+                    UpdateClosestPsych(currentPrice, _nearestPsychHalfAbove, _nearestPsychHalfBelow, ref closestLevel, ref minDistance);
+                }
+                if (ShowPsychQuartiles)
+                {
+                    UpdateClosestPsych(currentPrice, _nearestPsychQuartileAbove, _nearestPsychQuartileBelow, ref closestLevel, ref minDistance);
+                }
+
+                if (closestLevel != -1)
+                {
+                    ActiveZonesDict[ZoneType.PsychLevel] = new Zone { Top = closestLevel + atrBuffer, Bottom = closestLevel - atrBuffer, Tier = ZoneTier.Mid };
+                }
             }
+        }
+
+        private void UpdateClosestPsych(double current, double above, double below, ref double closest, ref double minDir)
+        {
+            double distAbove = Math.Abs(current - above);
+            double distBelow = Math.Abs(current - below);
+            
+            if (distAbove < minDir) { minDir = distAbove; closest = above; }
+            if (distBelow < minDir) { minDir = distBelow; closest = below; }
         }
 
         private void DrawPsychLevels()
@@ -696,30 +698,52 @@ namespace cAlgo.Indicators
             Color halfColor = Color.FromArgb(153, Color.Green); 
             Color quartColor = Color.FromArgb(102, Color.Green); 
 
-            var centAbove = Chart.DrawRectangle("Psych_Cent_Above", startIndex, _nearestPsychCenturyAbove + atrBuffer, endIndex, _nearestPsychCenturyAbove - atrBuffer, centColor);
-            centAbove.IsFilled = true;
-            var centBelow = Chart.DrawRectangle("Psych_Cent_Below", startIndex, _nearestPsychCenturyBelow + atrBuffer, endIndex, _nearestPsychCenturyBelow - atrBuffer, centColor);
-            centBelow.IsFilled = true;
+            if (ShowPsychCenturies)
+            {
+                var centAbove = Chart.DrawRectangle("Psych_Cent_Above", startIndex, _nearestPsychCenturyAbove + atrBuffer, endIndex, _nearestPsychCenturyAbove - atrBuffer, centColor);
+                centAbove.IsFilled = true;
+                var centBelow = Chart.DrawRectangle("Psych_Cent_Below", startIndex, _nearestPsychCenturyBelow + atrBuffer, endIndex, _nearestPsychCenturyBelow - atrBuffer, centColor);
+                centBelow.IsFilled = true;
+            }
+            else
+            {
+                Chart.RemoveObject("Psych_Cent_Above");
+                Chart.RemoveObject("Psych_Cent_Below");
+            }
 
-            var halfAbove = Chart.DrawRectangle("Psych_Half_Above", startIndex, _nearestPsychHalfAbove + atrBuffer, endIndex, _nearestPsychHalfAbove - atrBuffer, halfColor);
-            halfAbove.IsFilled = true;
-            var halfBelow = Chart.DrawRectangle("Psych_Half_Below", startIndex, _nearestPsychHalfBelow + atrBuffer, endIndex, _nearestPsychHalfBelow - atrBuffer, halfColor);
-            halfBelow.IsFilled = true;
+            if (ShowPsychHalves)
+            {
+                var halfAbove = Chart.DrawRectangle("Psych_Half_Above", startIndex, _nearestPsychHalfAbove + atrBuffer, endIndex, _nearestPsychHalfAbove - atrBuffer, halfColor);
+                halfAbove.IsFilled = true;
+                var halfBelow = Chart.DrawRectangle("Psych_Half_Below", startIndex, _nearestPsychHalfBelow + atrBuffer, endIndex, _nearestPsychHalfBelow - atrBuffer, halfColor);
+                halfBelow.IsFilled = true;
+            }
+            else
+            {
+                Chart.RemoveObject("Psych_Half_Above");
+                Chart.RemoveObject("Psych_Half_Below");
+            }
 
-            var quartAbove = Chart.DrawRectangle("Psych_Quart_Above", startIndex, _nearestPsychQuartileAbove + atrBuffer, endIndex, _nearestPsychQuartileAbove - atrBuffer, quartColor);
-            quartAbove.IsFilled = true;
-            var quartBelow = Chart.DrawRectangle("Psych_Quart_Below", startIndex, _nearestPsychQuartileBelow + atrBuffer, endIndex, _nearestPsychQuartileBelow - atrBuffer, quartColor);
-            quartBelow.IsFilled = true;
+            if (ShowPsychQuartiles)
+            {
+                var quartAbove = Chart.DrawRectangle("Psych_Quart_Above", startIndex, _nearestPsychQuartileAbove + atrBuffer, endIndex, _nearestPsychQuartileAbove - atrBuffer, quartColor);
+                quartAbove.IsFilled = true;
+                var quartBelow = Chart.DrawRectangle("Psych_Quart_Below", startIndex, _nearestPsychQuartileBelow + atrBuffer, endIndex, _nearestPsychQuartileBelow - atrBuffer, quartColor);
+                quartBelow.IsFilled = true;
+            }
+            else
+            {
+                Chart.RemoveObject("Psych_Quart_Above");
+                Chart.RemoveObject("Psych_Quart_Below");
+            }
         }
 
         private void ScanOrderBlocks()
         {
-            // 1. CLEANUP (Only manage chart objects if not backtesting)
             for (int i = _activeOrderBlocks.Count - 1; i >= 0; i--)
             {
                 var ob = _activeOrderBlocks[i];
                 double currentClose = Bars.ClosePrices[_lastProcessedIndex];
-
                 bool broken = (ob.IsBullish && currentClose < ob.Bottom) || (!ob.IsBullish && currentClose > ob.Top);
         
                 if (broken)
@@ -736,28 +760,24 @@ namespace cAlgo.Indicators
             double close = Bars.ClosePrices[index];
             double bodySize = Math.Abs(close - open);
 
-            // Only look for a new OB if we have an impulse candle (1.5x ATR)
             if (bodySize > (_atr.Result[index] * 1.5))
             {
                 bool isBullishImpulse = close > open;
                 int traceIndex = -1;
 
-                // 2. UNROLLED LOOP (Direct checks for the 3 preceding candles)
-                // We look for the "Opposite" candle that preceded the impulse
                 if (isBullishImpulse)
                 {
                     if (Bars.ClosePrices[index - 1] < Bars.OpenPrices[index - 1]) traceIndex = index - 1;
                     else if (Bars.ClosePrices[index - 2] < Bars.OpenPrices[index - 2]) traceIndex = index - 2;
                     else if (Bars.ClosePrices[index - 3] < Bars.OpenPrices[index - 3]) traceIndex = index - 3;
                 }
-                else // Bearish Impulse
+                else 
                 {
                     if (Bars.ClosePrices[index - 1] > Bars.OpenPrices[index - 1]) traceIndex = index - 1;
                     else if (Bars.ClosePrices[index - 2] > Bars.OpenPrices[index - 2]) traceIndex = index - 2;
                     else if (Bars.ClosePrices[index - 3] > Bars.OpenPrices[index - 3]) traceIndex = index - 3;
                 }
 
-                // 3. ADD THE ZONE IF FOUND
                 if (traceIndex != -1)
                 {
                     _obCounter++;
@@ -772,12 +792,7 @@ namespace cAlgo.Indicators
                         Name = obName
                     });
 
-                    ActiveZonesDict[ZoneType.OrderBlock] = new Zone 
-                    { 
-                        Top = Bars.HighPrices[traceIndex], 
-                        Bottom = Bars.LowPrices[traceIndex], 
-                        Tier = ZoneTier.Mid 
-                    };
+                    ActiveZonesDict[ZoneType.OrderBlock] = new Zone { Top = Bars.HighPrices[traceIndex], Bottom = Bars.LowPrices[traceIndex], Tier = ZoneTier.Mid };
                 }   
             }
         }
@@ -803,7 +818,6 @@ namespace cAlgo.Indicators
             {
                 var formation = _activeDoubles[i];
                 double currentClose = Bars.ClosePrices[_lastProcessedIndex];
-
                 if (currentClose > formation.Top || currentClose < formation.Bottom)
                 {
                     Chart.RemoveObject(formation.Name);
@@ -816,51 +830,33 @@ namespace cAlgo.Indicators
 
             double currentHigh = Bars.HighPrices[index];
             double currentLow = Bars.LowPrices[index];
-    
             double microAtrBuffer = _atr.Result[index] * MicroAtrMultiplier;
 
             for (int i = MinFormationCandles; i <= MaxLookbackCandles; i++)
             {
                 int pastIndex = index - i;
                 double pastHigh = Bars.HighPrices[pastIndex];
-                double pastLow = Bars.LowPrices[pastIndex];
                 double pastBodyMax = Math.Max(Bars.OpenPrices[pastIndex], Bars.ClosePrices[pastIndex]);
                 double pastBodyMin = Math.Min(Bars.OpenPrices[pastIndex], Bars.ClosePrices[pastIndex]);
 
-                // ==========================================
-                // OPTIMIZED DOUBLE TOP LOGIC
-                // ==========================================
                 double topWickSize = pastHigh - pastBodyMax;
                 double zoneMaxTop = pastHigh + topWickSize;
                 double zoneMinTop = pastBodyMax; 
 
                 if (currentHigh >= zoneMinTop && currentHigh <= zoneMaxTop)
                 {
-                    // REPLACEMENT FOR YOUR NESTED LOOP:
-                    // This one line replaces the "for (int j = 1; j < i; j++)" block
                     double lowestBetween = Bars.LowPrices.Minimum(i); 
-
-                    // We use a simple ATR-based distance check to ensure it's a "V" shape
                     if (currentHigh - lowestBetween > microAtrBuffer * 2) 
                     {
                         _doubleCounter++;
-                        _activeDoubles.Add(new ChartFormation
-                        {
-                            Top = zoneMaxTop,
-                            Bottom = zoneMinTop,
-                            StartIndex = pastIndex,
-                            Name = "DoubleTop_" + _doubleCounter
-                        });
-
+                        _activeDoubles.Add(new ChartFormation { Top = zoneMaxTop, Bottom = zoneMinTop, StartIndex = pastIndex, Name = "DoubleTop_" + _doubleCounter });
                         ActiveZonesDict[ZoneType.DoubleTop] = new Zone { Top = zoneMaxTop, Bottom = zoneMinTop, Tier = ZoneTier.Minor };
                         newFormationAdded = true;
                         break;
                     }
                 }
         
-                // ==========================================
-                // DOUBLE BOTTOM LOGIC
-                // ==========================================
+                double pastLow = Bars.LowPrices[pastIndex];
                 double bottomWickSize = pastBodyMin - pastLow;
                 double zoneMaxBottom = pastBodyMin; 
                 double zoneMinBottom = pastLow - bottomWickSize;
@@ -868,34 +864,22 @@ namespace cAlgo.Indicators
                 if (currentLow <= zoneMaxBottom && currentLow >= zoneMinBottom)
                 {
                     double highestBetween = Bars.LowPrices.Maximum(i);
-
                     if (highestBetween - currentLow > microAtrBuffer * 2) 
                     {
                         _doubleCounter++;
-                        _activeDoubles.Add(new ChartFormation
-                        {
-                            Top = zoneMaxBottom,
-                            Bottom = zoneMinBottom,
-                            StartIndex = pastIndex,
-                            Name = "DoubleBot_" + _doubleCounter
-                        });
-
-                        // --- Update Dictionary for Bot ---
+                        _activeDoubles.Add(new ChartFormation { Top = zoneMaxBottom, Bottom = zoneMinBottom, StartIndex = pastIndex, Name = "DoubleBot_" + _doubleCounter });
                         ActiveZonesDict[ZoneType.DoubleBottom] = new Zone { Top = zoneMaxBottom, Bottom = zoneMinBottom, Tier = ZoneTier.Minor };
-                        
                         newFormationAdded = true;
                         break;
                     }
                 }
             }
-
             return newFormationAdded;
         }
 
         private void DrawDoubles()
         {
             Color formationColor = Color.FromArgb(128, Color.Blue);
-
             foreach (var formation in _activeDoubles)
             {
                 var box = Chart.DrawRectangle(formation.Name, formation.StartIndex, formation.Top, _lastProcessedIndex + 3, formation.Bottom, formationColor);
@@ -909,7 +893,6 @@ namespace cAlgo.Indicators
             {
                 var zone = _activeConsolidations[i];
                 double currentClose = Bars.ClosePrices[_lastProcessedIndex];
-
                 if (currentClose > zone.Top || currentClose < zone.Bottom)
                 {
                     Chart.RemoveObject(zone.Name);
@@ -918,37 +901,22 @@ namespace cAlgo.Indicators
             }
 
             int index = _lastProcessedIndex - 1;
-    
             if (index < MinFormationCandles || double.IsNaN(_atr.Result[index])) return;
 
             foreach (var zone in _activeConsolidations)
             {
-                if (Bars.ClosePrices[index] <= zone.Top && Bars.ClosePrices[index] >= zone.Bottom)
-                    return; 
+                if (Bars.ClosePrices[index] <= zone.Top && Bars.ClosePrices[index] >= zone.Bottom) return; 
             }
 
             double maxZoneHeight = _atr.Result[index] * MaxConsolidationAtrWidth; 
             double microAtrBuffer = _atr.Result[index] * MicroAtrMultiplier;
-
-            double highestHigh = double.MinValue;
-            double lowestLow = double.MaxValue;
-
-            // Instant lookup of the range extrema
-            highestHigh = Bars.HighPrices.Maximum(MinFormationCandles);
-            lowestLow = Bars.LowPrices.Minimum(MinFormationCandles);
+            double highestHigh = Bars.HighPrices.Maximum(MinFormationCandles);
+            double lowestLow = Bars.LowPrices.Minimum(MinFormationCandles);
 
             if ((highestHigh - lowestLow) <= maxZoneHeight)
             {
                 _consolidationCounter++;
-                _activeConsolidations.Add(new ChartFormation
-                {
-                    Top = highestHigh + microAtrBuffer,
-                    Bottom = lowestLow - microAtrBuffer,
-                    StartIndex = index - MinFormationCandles + 1, 
-                    Name = "Consolidation_" + _consolidationCounter
-                });
-
-                // --- Update Dictionary for Bot ---
+                _activeConsolidations.Add(new ChartFormation { Top = highestHigh + microAtrBuffer, Bottom = lowestLow - microAtrBuffer, StartIndex = index - MinFormationCandles + 1, Name = "Consolidation_" + _consolidationCounter });
                 ActiveZonesDict[ZoneType.Consolidation] = new Zone { Top = highestHigh + microAtrBuffer, Bottom = lowestLow - microAtrBuffer, Tier = ZoneTier.Minor };
             }
         }
@@ -956,7 +924,6 @@ namespace cAlgo.Indicators
         private void DrawConsolidations()
         {
             Color formationColor = Color.FromArgb(77, Color.Blue);
-
             foreach (var zone in _activeConsolidations)
             {
                 var box = Chart.DrawRectangle(zone.Name, zone.StartIndex, zone.Top, _lastProcessedIndex + 3, zone.Bottom, formationColor);
@@ -969,13 +936,10 @@ namespace cAlgo.Indicators
             int index = _lastProcessedIndex - 1;
             if (index < 2 || double.IsNaN(_atr.Result[index])) return;
 
-            // 1. HIGH-SPEED CLEANUP
-            // We only touch the Chart object if we are NOT in the backtester
             for (int i = _activeRejections.Count - 1; i >= 0; i--)
             {
                 var rej = _activeRejections[i];
                 double currentClose = Bars.ClosePrices[_lastProcessedIndex]; 
-
                 if (currentClose > rej.Top || currentClose < rej.Bottom)
                 {
                     if (!IsBacktesting) Chart.RemoveObject(rej.Name);
@@ -983,13 +947,9 @@ namespace cAlgo.Indicators
                 }
             }
 
-            // 2. STREAMLINED UPGRADES
-            // Instead of looping, we check the list specifically for the last few bars
             for (int i = 0; i < _activeRejections.Count; i++)
             {
                 var rej = _activeRejections[i];
-
-                // Check if the rejection from 1 bar ago needs a Mid-Tier upgrade
                 if (rej.Tier == ZoneTier.Minor && rej.StartIndex == index - 1)
                 {
                     if (Bars.ClosePrices[index] > Bars.HighPrices[index - 1] || Bars.ClosePrices[index] < Bars.LowPrices[index - 1])
@@ -998,7 +958,6 @@ namespace cAlgo.Indicators
                         ActiveZonesDict[ZoneType.Rejection] = new Zone { Top = rej.Top, Bottom = rej.Bottom, Tier = ZoneTier.Mid };
                     }
                 }
-                // Check if the rejection from 2 bars ago needs a Major-Tier upgrade
                 else if (rej.Tier == ZoneTier.Mid && rej.StartIndex == index - 2)
                 {
                     if (Bars.ClosePrices[index] > Bars.HighPrices[index - 1] || Bars.ClosePrices[index] < Bars.LowPrices[index - 1])
@@ -1009,34 +968,28 @@ namespace cAlgo.Indicators
                 }
             }
 
-            // 3. FASTER PATTERN DETECTION
             double open = Bars.OpenPrices[index];
             double close = Bars.ClosePrices[index];
             double high = Bars.HighPrices[index];
             double low = Bars.LowPrices[index];
-
             double body = Math.Abs(close - open);
             double totalRange = high - low;
             double lowerWick = Math.Min(open, close) - low;
             double upperWick = high - Math.Max(open, close);
 
-            // Optimized boolean logic
             bool isBullishRejection = lowerWick >= (body * 2) && lowerWick >= (totalRange * 0.5);
             bool isBearishRejection = upperWick >= (body * 2) && upperWick >= (totalRange * 0.5);
 
             if (isBullishRejection || isBearishRejection)
             {
-                // Simple check: is this bar already a rejection?
                 bool exists = false;
-                if (_activeRejections.Count > 0 && _activeRejections[_activeRejections.Count - 1].StartIndex == index)
-                    exists = true;
+                if (_activeRejections.Count > 0 && _activeRejections[_activeRejections.Count - 1].StartIndex == index) exists = true;
 
                 if (!exists)
                 {
                     _rejectionCounter++;
                     double microAtr = _atr.Result[index] * MicroAtrMultiplier;
                     double top, bottom;
-
                     if (isBullishRejection)
                     {
                         bottom = low - microAtr;
@@ -1047,16 +1000,7 @@ namespace cAlgo.Indicators
                         top = high + microAtr;
                         bottom = close - upperWick - microAtr;
                     }
-
-                    _activeRejections.Add(new RejectionFormation
-                    {
-                        Top = top,
-                        Bottom = bottom,
-                        StartIndex = index,
-                        Name = "Rejection_" + _rejectionCounter,
-                        Tier = ZoneTier.Minor
-                    });
-
+                    _activeRejections.Add(new RejectionFormation { Top = top, Bottom = bottom, StartIndex = index, Name = "Rejection_" + _rejectionCounter, Tier = ZoneTier.Minor });
                     ActiveZonesDict[ZoneType.Rejection] = new Zone { Top = top, Bottom = bottom, Tier = ZoneTier.Minor };
                 }
             }
@@ -1067,34 +1011,26 @@ namespace cAlgo.Indicators
             Color minorColor = Color.FromArgb(70, Color.Blue);
             Color midColor = Color.FromArgb(120, Color.Blue);
             Color majorColor = Color.FromArgb(180, Color.Blue);
-
             foreach (var rej in _activeRejections)
             {
                 Color drawColor = minorColor;
                 if (rej.Tier == ZoneTier.Mid) drawColor = midColor;
                 else if (rej.Tier == ZoneTier.Major) drawColor = majorColor;
-
                 var box = Chart.DrawRectangle(rej.Name, rej.StartIndex, rej.Top, _lastProcessedIndex + 3, rej.Bottom, drawColor);
                 box.IsFilled = true;
             }
         }
 
-        // ==========================================
-        // BOT HELPER METHODS
-        // ==========================================
         private Zone GetClosestZone(ZoneType[] typesToSearch, double currentPrice)
         {
             Zone closestZone = null;
             double smallestDistance = double.MaxValue;
-
             foreach (var type in typesToSearch)
             {
                 if (ActiveZonesDict.ContainsKey(type))
                 {
                     Zone zoneToCheck = ActiveZonesDict[type];
-                    double zoneCenter = (zoneToCheck.Top + zoneToCheck.Bottom) / 2;
-                    double distance = Math.Abs(currentPrice - zoneCenter);
-
+                    double distance = Math.Abs(currentPrice - (zoneToCheck.Top + zoneToCheck.Bottom) / 2);
                     if (distance < smallestDistance)
                     {
                         smallestDistance = distance;
@@ -1107,68 +1043,37 @@ namespace cAlgo.Indicators
 
         public void CheckRejection(TradeType tradeType, double currHigh, double currLow, double currClose, double prevClose, RejectionMode mode, out bool rejectedMinor, out bool rejectedMid, out bool rejectedMajor)
         {
-            rejectedMinor = false;
-            rejectedMid = false;
-            rejectedMajor = false;
+            rejectedMinor = rejectedMid = rejectedMajor = false;
+            List<Zone> zones = new List<Zone>();
 
-            List<Zone> closestZonesToTest = new List<Zone>();
+            void AddZone(ZoneType[] types) { var z = GetClosestZone(types, currClose); if (z != null) zones.Add(z); }
+            AddZone(new[] { ZoneType.AsianHigh, ZoneType.LondonHigh, ZoneType.NyHigh });
+            AddZone(new[] { ZoneType.AsianLow, ZoneType.LondonLow, ZoneType.NyLow });
+            AddZone(new[] { ZoneType.MultidayHigh });
+            AddZone(new[] { ZoneType.MultidayLow });
+            AddZone(new[] { ZoneType.DailyHigh });
+            AddZone(new[] { ZoneType.DailyLow });
+            AddZone(new[] { ZoneType.OrderBlock });
+            AddZone(new[] { ZoneType.PsychLevel });
+            AddZone(new[] { ZoneType.DoubleTop });
+            AddZone(new[] { ZoneType.DoubleBottom });
+            AddZone(new[] { ZoneType.Consolidation });
+            AddZone(new[] { ZoneType.Rejection });
 
-            var sessionHigh = GetClosestZone(new[] { ZoneType.AsianHigh, ZoneType.LondonHigh, ZoneType.NyHigh }, currClose);
-            if (sessionHigh != null) closestZonesToTest.Add(sessionHigh);
-
-            var sessionLow = GetClosestZone(new[] { ZoneType.AsianLow, ZoneType.LondonLow, ZoneType.NyLow }, currClose);
-            if (sessionLow != null) closestZonesToTest.Add(sessionLow);
-
-            var multidayHigh = GetClosestZone(new[] { ZoneType.MultidayHigh }, currClose);
-            if (multidayHigh != null) closestZonesToTest.Add(multidayHigh);
-            
-            var multidayLow = GetClosestZone(new[] { ZoneType.MultidayLow }, currClose);
-            if (multidayLow != null) closestZonesToTest.Add(multidayLow);
-            
-            var dailyHigh = GetClosestZone(new[] { ZoneType.DailyHigh }, currClose);
-            if (dailyHigh != null) closestZonesToTest.Add(dailyHigh);
-            
-            var dailyLow = GetClosestZone(new[] { ZoneType.DailyLow }, currClose);
-            if (dailyLow != null) closestZonesToTest.Add(dailyLow);
-
-            var orderBlock = GetClosestZone(new[] { ZoneType.OrderBlock }, currClose);
-            if (orderBlock != null) closestZonesToTest.Add(orderBlock);
-
-            var psychLevel = GetClosestZone(new[] { ZoneType.PsychLevel }, currClose);
-            if (psychLevel != null) closestZonesToTest.Add(psychLevel);
-
-            var doubleTop = GetClosestZone(new[] { ZoneType.DoubleTop }, currClose);
-            if (doubleTop != null) closestZonesToTest.Add(doubleTop);
-
-            var doubleBot = GetClosestZone(new[] { ZoneType.DoubleBottom }, currClose);
-            if (doubleBot != null) closestZonesToTest.Add(doubleBot);
-
-            var consolidation = GetClosestZone(new[] { ZoneType.Consolidation }, currClose);
-            if (consolidation != null) closestZonesToTest.Add(consolidation);
-
-            var rejectionFormation = GetClosestZone(new[] { ZoneType.Rejection }, currClose);
-            if (rejectionFormation != null) closestZonesToTest.Add(rejectionFormation);
-
-            foreach (var zone in closestZonesToTest)
+            foreach (var zone in zones)
             {
                 bool isRejected = false;
-
                 if (mode == RejectionMode.WickInsideCloseOutside)
                 {
-                    if (tradeType == TradeType.Buy && currHigh >= zone.Bottom && currClose < zone.Bottom)
-                        isRejected = true;
-                    else if (tradeType == TradeType.Sell && currLow <= zone.Top && currClose > zone.Top)
-                        isRejected = true;
+                    if (tradeType == TradeType.Buy && currHigh >= zone.Bottom && currClose < zone.Bottom) isRejected = true;
+                    else if (tradeType == TradeType.Sell && currLow <= zone.Top && currClose > zone.Top) isRejected = true;
                 }
-                else if (mode == RejectionMode.PrevCloseInsideCurrCloseOutside)
+                else
                 {
-                    bool prevCloseInside = prevClose >= zone.Bottom && prevClose <= zone.Top;
-                    if (tradeType == TradeType.Buy && prevCloseInside && currClose < zone.Bottom)
-                        isRejected = true;
-                    else if (tradeType == TradeType.Sell && prevCloseInside && currClose > zone.Top)
-                        isRejected = true;
+                    bool prevInside = prevClose >= zone.Bottom && prevClose <= zone.Top;
+                    if (tradeType == TradeType.Buy && prevInside && currClose < zone.Bottom) isRejected = true;
+                    else if (tradeType == TradeType.Sell && prevInside && currClose > zone.Top) isRejected = true;
                 }
-
                 if (isRejected)
                 {
                     if (zone.Tier == ZoneTier.Minor) rejectedMinor = true;

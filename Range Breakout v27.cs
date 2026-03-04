@@ -137,8 +137,14 @@ namespace cAlgo.Robots
         public bool IndShowLondonSession { get; set; }
         [Parameter("Show NY", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowNySession { get; set; }
-        [Parameter("Show Psych", DefaultValue = true, Group = "8. Indicator Vis")] 
-        public bool IndShowPsychLevels { get; set; }
+        [Parameter("Show Psych Centuries", DefaultValue = true, Group = "8. Indicator Vis")]
+        public bool IndShowPsychCenturies { get; set; }
+
+        [Parameter("Show Psych Halves", DefaultValue = true, Group = "8. Indicator Vis")]
+        public bool IndShowPsychHalves { get; set; }
+
+        [Parameter("Show Psych Quartiles", DefaultValue = true, Group = "8. Indicator Vis")]
+        public bool IndShowPsychQuartiles { get; set; }
         [Parameter("Show OBs", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowOrderBlocks { get; set; }
         [Parameter("Show Doubles", DefaultValue = true, Group = "8. Indicator Vis")] 
@@ -239,13 +245,12 @@ namespace cAlgo.Robots
 
             startingBalance = Account.Balance;
 
-            _snrIndicator = Indicators.GetIndicator<DynamicSnRBoxes>(
-                IndShowMultiday, IndShowPreviousDay, IndShowAsianSession, IndShowLondonSession, IndShowNySession, 
-                IndShowPsychLevels, IndShowOrderBlocks, IndShowDoubleTopsBottoms, IndShowConsolidation, IndShowRejection, 
-                IndMacroAtrMult, IndMicroAtrMult, IndPsychLevelStep, IndUtcOffset, IndMultidayTimeFrame, IndMultidayLookback, 
-                IndAsianStartHour, IndAsianEndHour, IndLondonStartHour, IndLondonEndHour, IndNyStartHour, IndNyEndHour, 
-                IndMinFormationCandles, IndMaxLookbackCandles, IndMaxConsolidationAtrWidth
-            );
+            _snrIndicator = Indicators.GetIndicator<DynamicSnRBoxes>(IndShowMultiday, IndShowPreviousDay, IndShowAsianSession, IndShowLondonSession, 
+                            IndShowNySession, IndShowPsychCenturies, IndShowPsychHalves, IndShowPsychQuartiles, IndShowOrderBlocks, 
+                            IndShowDoubleTopsBottoms, IndShowConsolidation, IndShowRejection, IndMacroAtrMult, IndMicroAtrMult, IndPsychLevelStep, 
+                            IndUtcOffset, IndMultidayTimeFrame, IndMultidayLookback, IndAsianStartHour, IndAsianEndHour, IndLondonStartHour, 
+                            IndLondonEndHour, IndNyStartHour, IndNyEndHour, IndMinFormationCandles, IndMaxLookbackCandles, 
+                            IndMaxConsolidationAtrWidth);
 
             _m1Bars = MarketData.GetBars(TimeFrame.Minute);
             _m1Bars.BarOpened += OnM1BarOpened;
