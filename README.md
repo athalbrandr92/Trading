@@ -1,5 +1,5 @@
 Institutional-Grade cTrader Algo Suite 📈
-A complete, open-source algorithmic trading suite for cTrader, designed specifically for passing and managing Proprietary Trading Firm evaluation accounts.
+A complete, open-source algorithmic trading suite for cTrader, designed specifically for passing and managing Proprietary Trading Firm evaluation accounts
 
 ⚠️ IMPORTANT DISCLAIMER ⚠️
 This is not a magical ATM. These algorithms are highly surgical breakout and trend-following tools. They are designed to strictly limit drawdown and protect equity. If you disable the risk management parameters, crank your leverage to maximum, and run this without proper genetic optimization for your specific broker's spread, you will blow your account. Use responsibly, optimize on quality tick data, and test on a demo account first.
@@ -51,23 +51,7 @@ The Drawdown Penalty: The algorithm violently penalizes reckless parameter sets.
 Trade Count Scaling: Penalizes parameter sets that don't take enough trades (curve-fitting) and applies hyperbolic or linear decay to sets that over-trade (commission bleeding).
 
 ⚙️ Usage & Optimization
-Download and install the DynamicSnRBoxes indicator first.
 
-Install Range Breakout and Wave Rider.
+Assuming you already have cTrader installed, download the Sources folder. Go to your My Documents. Double click into cAlgo. This is where you should place the Sources folder. You will presumably not already have a bot or indicator by the same name as mine and it should go smoothly. If it does not, either you are updating and should replace all or you have named some files the same things as I have named mine. Shoot me an email marked high priority to athalbrandr92@gmail.com if you can't get hold of me on here. May add my Facebook info later.
 
-Always optimize for your specific broker's spread and timezones using cTrader's genetic optimizer. Adjust the hardcoded 5% and 10% drawdown penalties in the code to match your specific prop firm's daily and maximum loss limits.
-
-How to Install in cTrader:
-Because this repository provides the raw, transparent C# source code (.cs files) rather than locked executable files, you need to quickly build them inside your cTrader platform.
-
-1. Open cTrader and navigate to the Automate tab on the left menu.
-
-2. Click New cBot (for Range Breakout/Wave Rider) or New Indicator (for DynamicSnRBoxes).
-
-3. Name the new file exactly what it is called in this repository.
-
-4. Delete the default template code that cTrader generates.
-
-5. Copy all the text from the GitHub .cs file and paste it into the cTrader code editor.
-
-6. Click the Build icon at the top of the editor. If the build is successful, it will appear in your list of available cBots/Indicators.
+Always optimize for your specific broker's spread and timezones using cTrader's genetic optimizer. Adjust the hardcoded 5% and 10% drawdown penalties in the code to match your specific prop firm's daily and maximum loss limits. There is a more heavily detailed README for optimization and even that one needs another go at going in depth with the full process. It isn't a complex system to set up and it isn't complex to understand, it just has a lot of steps and a lot of the steps are repeats of lower levels and even repeats of lower levels with particular portions added or removed. That's why it may take some time for the full instruction manual to come out.
