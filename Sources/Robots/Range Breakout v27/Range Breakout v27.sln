@@ -1,0 +1,28 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30011.22
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DynamicSnRBoxes", "..\..\Indicators\DynamicSnRBoxes\DynamicSnRBoxes\DynamicSnRBoxes.csproj", "{11a73189-6022-4438-9044-4b0a158da697}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DynamicSnRBoxes_v2", "..\..\Indicators\DynamicSnRBoxes_v2\DynamicSnRBoxes_v2\DynamicSnRBoxes_v2.csproj", "{2bd3ef90-e483-4851-bb3a-d6112503a02a}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Range Breakout v27", "Range Breakout v27\Range Breakout v27.csproj", "{9d299b88-38e9-4e30-9c52-815d3e4d6dd6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9d299b88-38e9-4e30-9c52-815d3e4d6dd6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9d299b88-38e9-4e30-9c52-815d3e4d6dd6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9d299b88-38e9-4e30-9c52-815d3e4d6dd6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9d299b88-38e9-4e30-9c52-815d3e4d6dd6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
+
+
