@@ -3,7 +3,7 @@ using System.Linq;
 using cAlgo.API;
 using cAlgo.API.Internals;
 using cAlgo.API.Indicators;
-using cAlgo.Indicators; // Required to see the Indicator's classes
+using cAlgo.Indicators;
 
 namespace cAlgo.Robots
 {
@@ -12,11 +12,11 @@ namespace cAlgo.Robots
     {
         // --- 1. TIME SETTINGS ---
         [Parameter("Start Time (hour)", DefaultValue = 9, MinValue = 0, MaxValue = 23, Step = 1, Group = "1. Time")] 
-        public int StartTime { get; set; }
+        public int StartHour { get; set; }
         [Parameter("End Time (hour)", DefaultValue = 9, MinValue = 0, MaxValue = 23, Group = "1. Time")] 
-        public int EndTime { get; set; }
+        public int EndHour { get; set; }
         [Parameter("Open Range Minute", DefaultValue = 0, MinValue = 0, MaxValue = 59, Group = "1. Time")] 
-        public int OpenRangeMin { get; set; }
+        public int StartMinute { get; set; }
         [Parameter("Lookback Minutes", DefaultValue = 12, MinValue = 1, MaxValue = 90, Group = "1. Time")] 
         public int LookbackMinutes { get; set; }
         [Parameter("Enable Holiday Blackout", DefaultValue = true, Group = "1. Time")] 
@@ -33,23 +33,23 @@ namespace cAlgo.Robots
         // --- 2. STRATEGY SETTINGS ---        
         [Parameter("Risk Percentage", DefaultValue = 1.0, MinValue = 0.1, MaxValue = 4.9, Step = 0.1, Group = "2. Risk Management")] 
         public double Risk { get; set; }
-        [Parameter("Max Dollar Risk", DefaultValue = 1000.0, Group = "2. Strategy")] 
-        public double MaxDollarRisk { get; set; }
-        [Parameter("ATR Buffer Mult", DefaultValue = 0.5, MinValue = 0.0, MaxValue = 5.0, Step = 0.25, Group = "2. Strategy")] 
+        [Parameter("Max Dollar Risk", DefaultValue = 45, MinValue = 1, Step = 1, Group = "2. Strategy")] 
+        public int MaxDollarRisk { get; set; }
+        [Parameter("ATR Buffer Mult", DefaultValue = 0.75, MinValue = 0.0, MaxValue = 5.0, Step = 0.25, Group = "2. Strategy")] 
         public double AtrBufferMult { get; set; }
 
-        public enum TpMode { Fixed, TrailingOnly, PivotPoints, SessionExtrema }
+        public enum TpMode { PivotPoints, SessionExtrema, Fixed, TrailingOnly }
         [Parameter("Primary TP Mode", DefaultValue = TpMode.Fixed, Group = "2. Strategy")] 
         public TpMode SelectedTpMode { get; set; }
-        [Parameter("R:R Ratio (Long)", DefaultValue = 9.75, MinValue = 0.5, MaxValue = 15, Step = 0.25, Group = "2. Strategy")] 
-        public double RRRatioLong { get; set; }
-        [Parameter("R:R Ratio (Short)", DefaultValue = 8.25, MinValue = 0.5, MaxValue = 15, Step = 0.25, Group = "2. Strategy")] 
-        public double RRRatioShort { get; set; }
         [Parameter("Pivot Level (1-3)", DefaultValue = 2, MinValue = 0.5, MaxValue = 8, Step = 0.5, Group = "2. Strategy")] 
         public double PivotLevel { get; set; }
         [Parameter("Extrema Lookback (Days)", DefaultValue = 3, MinValue = 1, MaxValue = 26, Group = "2. Strategy")] 
         public int ExtremaLookbackDays { get; set; }
-        [Parameter("Enable Wolfe Override", DefaultValue = true, Group = "2. Strategy")] 
+        [Parameter("R:R Ratio (Long)", DefaultValue = 9.75, MinValue = 0.5, MaxValue = 20, Step = 0.5, Group = "2. Strategy")] 
+        public double RRRatioLong { get; set; }
+        [Parameter("R:R Ratio (Short)", DefaultValue = 8.25, MinValue = 0.5, MaxValue = 20, Step = 0.5, Group = "2. Strategy")] 
+        public double RRRatioShort { get; set; }
+        [Parameter("Enable Wolfe Override", DefaultValue = false, Group = "2. Strategy")] 
         public bool UseWolfeOverride { get; set; }
 
         // --- 3. Filter Settings ---
@@ -76,19 +76,18 @@ namespace cAlgo.Robots
         public double AdxMax { get; set; }
         [Parameter("Min Body Ratio", DefaultValue = 0.3, MinValue = 0.2, MaxValue = 1.0, Step = 0.1, Group = "3. Filter Settings")] 
         public double MinBodyRatio { get; set; }
-        [Parameter("Max Rejection Wick", DefaultValue = 0.0, MinValue = 0.0, MaxValue = 0.5, Step = 0.1, Group = "3. Filter Settings")] 
+        [Parameter("Max Rejection Wick", DefaultValue = 0.1, MinValue = 0.0, MaxValue = 0.5, Step = 0.1, Group = "3. Filter Settings")] 
         public double MaxRejectionWickRatio { get; set; }
-        [Parameter("Max Spread (Pips)", DefaultValue = 45, MinValue = 0.5, MaxValue = 1000, Step = 0.5, Group = "3. Filter Settings")] 
+        [Parameter("Base Max Spread (Pips)", DefaultValue = 45, MinValue = 0.5, MaxValue = 1000, Step = 0.5, Group = "3. Filter Settings")] 
         public double MaxSpread { get; set; }
-        [Parameter("Max Candle (ATR Mult)", DefaultValue = 2.8, MinValue = 1.0, MaxValue = 4.0, Step = 0.25, Group = "3. Filter Settings")] 
+        [Parameter("Max Candle (ATR Mult)", DefaultValue = 2.5, MinValue = 1.0, MaxValue = 4.0, Step = 0.25, Group = "3. Filter Settings")] 
         public double MaxCandleAtrMultiplier { get; set; }
-        [Parameter("Min Volatility Ratio", DefaultValue = 0.7, MinValue = 0.5, MaxValue = 2.0, Step = 0.1, Group = "3. Filter Settings")] 
+        [Parameter("Min Volatility Ratio", DefaultValue = 0.75, MinValue = 0.5, MaxValue = 2.0, Step = 0.05, Group = "3. Filter Settings")] 
         public double MinVolatilityRatio { get; set; }
         [Parameter("ATR Short Period", DefaultValue = 14, MinValue = 2, MaxValue = 20, Step = 1, Group = "3. Filter Settings")] 
         public int AtrPeriod { get; set; }
         [Parameter("ATR Long Period", DefaultValue = 100, MinValue = 10, MaxValue = 250, Step = 5, Group = "3. Filter Settings")] 
         public int AtrLongPeriod { get; set; }
-
 
         // --- 4. TRAILING STOPS ---
         public enum TrailType { None, PSAR, MTF_EMA, Extrema, Chandelier }
@@ -96,15 +95,15 @@ namespace cAlgo.Robots
         public TrailType SelectedTrail { get; set; }
         [Parameter("Trail TimeFrame", DefaultValue = "Hour", Group = "4. Trailing")] 
         public TimeFrame TrailTF { get; set; }
-        [Parameter("EMA Trail Period", DefaultValue = 49, MinValue = 2, MaxValue = 100, Step = 1, Group = "4. Trailing")] 
+        [Parameter("EMA Trail Period", DefaultValue = 49, MinValue = 2, MaxValue = 101, Step = 1, Group = "4. Trailing")] 
         public int EmaTrailPeriod { get; set; }
-        [Parameter("Extrema Lookback (Bars)", DefaultValue = 6, MinValue = 1, MaxValue = 50, Group = "4. Trailing")] 
+        [Parameter("Extrema Lookback (Bars)", DefaultValue = 5, MinValue = 1, MaxValue = 100, Group = "4. Trailing")] 
         public int ExtremaBars { get; set; }
         [Parameter("PSAR Min AF", DefaultValue = 0.02, MinValue = 0.01, MaxValue = 0.1, Step = 0.01, Group = "4. Trailing")] 
         public double PsarMinAF { get; set; }
         [Parameter("PSAR Max AF", DefaultValue = 0.2, MinValue = 0.1, MaxValue = 1.0, Step = 0.05, Group = "4. Trailing")] 
         public double PsarMaxAF { get; set; }
-        [Parameter("Chandelier Mult", DefaultValue = 3.0, MinValue = 0.25, MaxValue = 5.0, Step = 0.25, Group = "4. Trailing")] 
+        [Parameter("Chandelier Mult", DefaultValue = 3.0, MinValue = 0.25, MaxValue = 25.0, Step = 0.25, Group = "4. Trailing")] 
         public double ChandelierMult { get; set; }
 
         // --- 5. MANAGEMENT ---
@@ -121,11 +120,13 @@ namespace cAlgo.Robots
         [Parameter("Hyperbolic Exponent", DefaultValue = 0.75, Group = "6. Fitness")] 
         public double HypExp { get; set; }
 
-        // --- 7. SNR MANAGEMENT ---
+        /*// --- 7. SNR MANAGEMENT ---
         [Parameter("Rejection Logic", DefaultValue = RejectionMode.WickInsideCloseOutside, Group = "7. SnR Management")] 
         public RejectionMode SnRRejectionMode { get; set; }
+        [Parameter("Rejection Override RR Base", DefaultValue = 3, MinValue = 0.5, MaxValue = 5, Step = 0.25, Group = "7. SnR Management")]
+        public double RejectionRR { get; set; }
 
-        // --- 8-11. INDICATOR S&R PARAMETERS (Passed to dynamic initialization) ---
+        // --- 8-11. INDICATOR S&R PARAMETERS ---
         [Parameter("Show Multiday", DefaultValue = true, Group = "8. Indicator Vis")] 
         public bool IndShowMultiday { get; set; }
         [Parameter("Show Prev Day", DefaultValue = true, Group = "8. Indicator Vis")] 
@@ -160,23 +161,24 @@ namespace cAlgo.Robots
         [Parameter("Multiday Lookback", DefaultValue = 1, MinValue = 1, MaxValue = 42, Group = "9. Indicator Core")] 
         public int IndMultidayLookback { get; set; }
 
-        [Parameter("Asian Start", DefaultValue = 18, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
+        [Parameter("Asian Start", DefaultValue = 21, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndAsianStartHour { get; set; }
-        [Parameter("Asian End", DefaultValue = 3, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
+        [Parameter("Asian End", DefaultValue = 9, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndAsianEndHour { get; set; }
-        [Parameter("London Start", DefaultValue = 3, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
+        [Parameter("London Start", DefaultValue = 7, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndLondonStartHour { get; set; }
-        [Parameter("London End", DefaultValue = 11, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
+        [Parameter("London End", DefaultValue = 17, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndLondonEndHour { get; set; }
-        [Parameter("NY Start", DefaultValue = 8, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
+        [Parameter("NY Start", DefaultValue = 12, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndNyStartHour { get; set; }
-        [Parameter("NY End", DefaultValue = 17, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
+        [Parameter("NY End", DefaultValue = 22, MinValue = 0, MaxValue = 23, Step = 1, Group = "10. Indicator Sessions")] 
         public int IndNyEndHour { get; set; }
 
         [Parameter("Min Formation", DefaultValue = 10, MinValue = 3, MaxValue = 30, Step = 1, Group = "11. Indicator Patterns")] 
         public int IndMinFormationCandles { get; set; }
         [Parameter("Max Lookback", DefaultValue = 50, MinValue = 15, MaxValue = 150, Step = 5, Group = "11. Indicator Patterns")] public int IndMaxLookbackCandles { get; set; }
         [Parameter("Max Consolidation ATR", DefaultValue = 1.5, MinValue = 0.25, MaxValue = 5.0, Step = 0.25, Group = "11. Indicator Patterns")] public double IndMaxConsolidationAtrWidth { get; set; }
+        */
 
         private Bars _htfBars, _dailyBars;
         private double openHigh, openLow, p1Price, p4Price;
@@ -186,7 +188,7 @@ namespace cAlgo.Robots
         private AverageTrueRange _atrShort, _atrLong, _chandelierAtr;
         private DirectionalMovementSystem _adx;
         private ParabolicSAR _psar;
-        private DynamicSnRBoxes _snrIndicator;
+        //private DynamicSnRBoxes _snrIndicator;
         private DateTime lastBarTime = DateTime.MinValue;
         private string Label => $"RB_{OrderMagic}";
         private double startingBalance;
@@ -198,92 +200,58 @@ namespace cAlgo.Robots
 
         protected override void OnStart()
         {
-            // --- 1. RSI SANITY CHECK ---
-            // Prevent the bot from running if RSI logic is contradictory
-            if (RSIHiLo && RSIReverse)
+            /*if (RSIHiLo && RSIReverse)
             {
                 Print("CRITICAL ERROR: Cannot enable both RSI High-Low and RSI Reverse simultaneously.");
                 Stop();
             }
 
-            // --- 2. SPREAD SANITY CHECK ---
-            // Alert the user if they've left the spread filter too tight for the asset
-            if (Symbol.Spread / Symbol.PipSize > MaxSpread)
-            {
-                Print("WARNING: Current spread ({0}) exceeds Max Spread ({1}). Bot will not trade.", 
-                    Symbol.Spread / Symbol.PipSize, MaxSpread);
-                Stop();
-            }
-
             if (RunningMode == RunningMode.Optimization)
             {    
-
-                // --- 3. TP SANITY CHECKS ---
                 if(SelectedTpMode != TpMode.Fixed && (RRRatioLong != 9.75 || RRRatioShort != 8.25))
                 {
-                    Print("ERROR: TP Mode is not set to Fixed. Stopping bot to save CPU cycles. Reset R:R Long to 9.75 and R:R Short to 8.25.");
-                    Stop();
-                }
-                else if(SelectedTpMode != TpMode.PivotPoints && PivotLevel != 2)
-                {
-                    Print("ERROR: TP Mode is not set to Pivot Points. Stopping bot to save CPU cycles. Set Pivot Level back to 2.");
-                    Stop();
-                }
-                else if(SelectedTpMode != TpMode.SessionExtrema && ExtremaLookbackDays != 6)
-                {
-                    Print("ERROR: TP Mode is not set to Session Extrema. Stopping bot to save CPU cycles. Reset Extrema Lookback to 6.");
-                    Stop();
-                }
-
-                // --- 4. TRAILING SL SANITY CHECKS --- 
-                if(SelectedTrail == TrailType.None && (EmaTrailPeriod != 49 || ExtremaBars != 6 || PsarMinAF != 0.02 || PsarMaxAF != 0.2 || ChandelierMult != 3.0))
-                {
-                    Print("ERROR: Trailing SL set to none and nondefault trailing parameters detected. Stopping bot to save CPU cycles. Reset EMA Period to 49, Extrema Bars to 6, PSAR Min AF to 0.02, PSAR Max AF to 0.2, and Chandelier Multiplier to 3.0.");
-                    Stop();
-                }
-                else if(SelectedTrail != TrailType.PSAR && (PsarMinAF != 0.02 || PsarMaxAF != 0.2))
-                {
-                    Print("ERROR: PSAR Trailing SL not selected. Stopping bot to save CPU cycles. Reset PSAR Min AF to 0.02 and Max AF to 0.2");
-                    Stop();
-                }
-                else if(SelectedTrail != TrailType.MTF_EMA && EmaTrailPeriod != 49)
-                {
-                    Print("ERROR: Trailing SL not set to EMA. Stopping bot to save CPU cycles. Reset EMA Period to 49.");
-                    Stop();
-                }
-                else if(SelectedTrail != TrailType.Extrema && ExtremaBars != 6)
-                {
-                    Print("ERROR: Trailing SL not set to Extrema. Stopping bot to save CPU cycles. Reset Extrema bar lookback to 6.");
-                    Stop();
-                }
-                else if(SelectedTrail != TrailType.Chandelier && ChandelierMult != 3.0)
-                {
-                    Print("ERROR: Trailing SL not set to Chandelier. Stopping bot to save CPU cycles. Reset Chandelier Mult to 3.0");
-                    Stop();
-                }
-
-                // --- 5. ADX SANITY CHECKS ---
-                if(AdxMode == AdxFilterMode.Off && (AdxPeriod != 14 || AdxMin != 15 || AdxMax != 27.5))
-                {
-                    Print("ERROR: ADX Mode set to off and nondefault parameters detected. Stopping bot to save CPU cycles. Please reset ADX period to 14, minimum to 15, and maximum to 27.5");
-                    Stop();
-                }
-                else if(AdxMode == AdxFilterMode.Min && AdxMax != 27.5)
-                {
-                    Print("ERROR: ADX Min Mode detected. Stopping bot to save CPU cycles. Please reset ADX Max to 27.5");
-                    Stop();
-                }
-                else if(AdxMode == AdxFilterMode.Max && AdxMin != 15)
-                {
-                    Print("ERROR: ADX Max Mode detected. Stopping bot to save CPU cycles. Please reset ADX Min to 15.");
+                    Print("ERROR: TP Mode is not set to Fixed. Reset R:R Long to 9.75 and R:R Short to 8.25.");
                     Stop();
                 }
             }
 
-            // --- 6. ATR SANITY CHECK ---
             if(AtrPeriod >= AtrLongPeriod)
             {
-                Print("ERROR: This strategy requires the fast ATR period to be lower than the slow ATR period to work. Stopping bot to save CPU cycles.");
+                Print("ERROR: Fast ATR period must be lower than Slow ATR period.");
+                Stop();
+            }*/
+
+            if (RunningMode == RunningMode.Optimization)
+            {
+                if(StartHour != EndHour) Stop();
+
+                /*
+                if(SelectedTrail != TrailType.PSAR && (PsarMaxAF != 0.2 || PsarMinAF != 0.02))
+                {
+                    Print("PSAR Trail Type not selected. Stopping pass. Please reset MinAF to 0.02 and MaxAF to 0.2.");
+                    Stop();
+                }
+                if(SelectedTrail != TrailType.MTF_EMA && EmaTrailPeriod != 30)
+                {
+                    Print("EMA Trail Type not selected. Stopping pass. Please reset EMA trail period to 30.");
+                    Stop();
+                }
+                if(SelectedTrail != TrailType.Extrema && ExtremaBars != 5)
+                {
+                    Print("Extrema Trail Type not selected. Stopping pass. Please reset Extrema Bars to 5.");
+                    Stop();
+                }
+                if(SelectedTrail != TrailType.Chandelier && ChandelierMult != 1)
+                {
+                    Print("Chandelier Trail Type not selected. Stopping pass. Please reset Chandelier multiplier to 1.");
+                    Stop();
+                }*/
+
+            }
+
+            if(AdxMin >= AdxMax)
+            {
+                Print("AdxMin cannot be equal to or higher than AdxMax. Stopping bot.");
                 Stop();
             }
 
@@ -306,19 +274,17 @@ namespace cAlgo.Robots
 
             startingBalance = Account.Balance;
 
-            // Initialize Indicator with ALL parameters exposed to the Optimizer
-            _snrIndicator = Indicators.GetIndicator<DynamicSnRBoxes>(
+            /*_snrIndicator = Indicators.GetIndicator<DynamicSnRBoxes>(
                 IndShowMultiday, IndShowPreviousDay, IndShowAsianSession, IndShowLondonSession, IndShowNySession, 
                 IndShowPsychLevels, IndShowOrderBlocks, IndShowDoubleTopsBottoms, IndShowConsolidation, IndShowRejection, 
                 IndMacroAtrMult, IndMicroAtrMult, IndPsychLevelStep, IndUtcOffset, IndMultidayTimeFrame, IndMultidayLookback, 
                 IndAsianStartHour, IndAsianEndHour, IndLondonStartHour, IndLondonEndHour, IndNyStartHour, IndNyEndHour, 
                 IndMinFormationCandles, IndMaxLookbackCandles, IndMaxConsolidationAtrWidth
-            );
+            );*/
 
             _m1Bars = MarketData.GetBars(TimeFrame.Minute);
             _m1Bars.BarOpened += OnM1BarOpened;
 
-            // 0 = Standard, 1 = HighLow, 2 = Reverse
             rsiMode = RSIHiLo ? 1 : (RSIReverse ? 2 : 0);
             InitializeHistoricalRange();
         }
@@ -330,7 +296,7 @@ namespace cAlgo.Robots
             currentDayLow = _dailyBars.LowPrices.Last(1);
             for (int i = _m1Bars.Count - 1; i >= LookbackMinutes; i--)
             {
-                if (_m1Bars.OpenTimes[i].Hour == StartTime && _m1Bars.OpenTimes[i].Minute == OpenRangeMin)
+                if (_m1Bars.OpenTimes[i].Hour == StartHour && _m1Bars.OpenTimes[i].Minute == StartMinute)
                 {
                     p1Index = i - LookbackMinutes;
                     p1Price = _m1Bars.OpenPrices[p1Index];
@@ -355,25 +321,24 @@ namespace cAlgo.Robots
             if (SelectedTrail != TrailType.None) 
                 HandleTrailing();
 
-            if (Server.Time.Minute == OpenRangeMin && Server.Time.Hour == StartTime)
+            if (Server.Time.Minute == StartMinute && Server.Time.Hour == StartHour)
                 DefineRanges();
         }
 
         protected override void OnBar()
         {
-            if(Positions.Count(p => p.Label == Label) > 0)
+            /*if(Positions.Count(p => p.Label == Label) > 0)
             {
-                // WAKE UP THE INDICATOR
                 if (_snrIndicator != null) 
                 {
                     double wakeUpCall = _snrIndicator.DummySignal.LastValue;
                 }
-            }
+            }*/
 
             if (Bars.OpenTimes.LastValue == lastBarTime) return;
             lastBarTime = Bars.OpenTimes.LastValue;
 
-            HandleSnRRejections();
+            //HandleSnRRejections();
 
             if (EnableTrade() && Positions.Count(p => p.Label == Label) < MaxPositions)
             {
@@ -382,14 +347,14 @@ namespace cAlgo.Robots
             }
         }
 
-        private void HandleSnRRejections()
+        /*private void HandleSnRRejections()
         {
             if (_snrIndicator == null || Bars.Count < 3) return;
 
             var currBar = Bars.Last(1);
             var prevBar = Bars.Last(2);
 
-            foreach (var pos in Positions.Where(p => p.Label == Label && p.SymbolName == SymbolName))
+            /*foreach (var pos in Positions.Where(p => p.Label == Label && p.SymbolName == SymbolName))
             {
                 double riskAmount = Account.Balance * (Risk / 100.0); 
                 if (riskAmount > MaxDollarRisk) riskAmount = MaxDollarRisk;
@@ -402,15 +367,15 @@ namespace cAlgo.Robots
 
                 bool shouldClose = false;
 
-                if (profitAmount >= riskAmount * 9)
+                if (profitAmount >= riskAmount * RejectionRR * 3)
                 {
                     if (rejMajor) shouldClose = true;
                 }
-                else if (profitAmount >= riskAmount * 6)
+                else if (profitAmount >= riskAmount * RejectionRR * 2)
                 {
                     if (rejMajor || rejMid) shouldClose = true;
                 }
-                else if (profitAmount >= riskAmount * 3)
+                else if (profitAmount >= riskAmount * RejectionRR)
                 {
                     if (rejMajor || rejMid || rejMinor) shouldClose = true;
                 }
@@ -421,16 +386,27 @@ namespace cAlgo.Robots
                     ClosePosition(pos);
                 }
             }
-        }
+        }*/
 
         private void TradeIfAble()
         {
-            if (Symbol.Spread / Symbol.PipSize > MaxSpread) return;
+    
+            // Crypto logic: Spreads on BTC/ETH can be massive during weekend gaps.
+            // If it's crypto, we might allow a slightly more generous multiplier.
             double atrS = _atrShort.Result.Last(1);
-            if (atrS < (_atrLong.Result.Last(1) * MinVolatilityRatio)) return;
+            double atrL = _atrLong.Result.Last(1);
+            double volRatio = atrS / Math.Max(0.00001, atrL);
+            double dynamicMaxSpread = Math.Truncate(MaxSpread * volRatio);           
+            
+            if (Symbol.Spread / Symbol.PipSize > dynamicMaxSpread) return;
 
+            // --- 2. VOLATILITY CHECK ---
+            if (atrS < (atrL * MinVolatilityRatio)) return;
+
+            // --- 3. CANDLE DIMENSIONS ---
             double close = Bars.ClosePrices.Last(1), open = Bars.OpenPrices.Last(1);
             double barH = Bars.HighPrices.Last(1), barL = Bars.LowPrices.Last(1);
+            double prevClose = Bars.ClosePrices.Last(2);
             double totR = barH - barL;
             if (totR > (atrS * MaxCandleAtrMultiplier)) return;
 
@@ -438,44 +414,39 @@ namespace cAlgo.Robots
             double bodyRatio = bodySize / totR;
             if (bodyRatio < MinBodyRatio) return;
 
+            // --- 4. TREND FILTERS ---
             bool maB = MaLogic == MaModeType.PriceAboveBelow ? close > ema.Result.LastValue : ema.Result.LastValue > ema.Result.Last(1);
             bool maS = MaLogic == MaModeType.PriceAboveBelow ? close < ema.Result.LastValue : ema.Result.LastValue < ema.Result.Last(1);
 
             double rsiVal = rsi.Result.Last(1);
-        bool rsiLong = false;
-        bool rsiShort = false;
+            bool rsiLong = false;
+            bool rsiShort = false;
 
-        // Branching allows the CPU to skip irrelevant logic entirely
-        if (rsiMode == 1) // High-Low (Most common)
-        {
-            rsiLong = rsiVal > RSIVal && rsiVal < (100 - RSIVal);
-            rsiShort = rsiVal < (100 - RSIVal) && rsiVal > RSIVal;
-        }
-        else if (rsiMode == 0) // Standard
-        {
-            rsiLong = rsiVal > RSIVal;
-            rsiShort = rsiVal < (100 - RSIVal);
-        }
-        else if (rsiMode == 2) // Reverse
-        {
-            rsiLong = rsiVal < RSIVal;
-            rsiShort = rsiVal > (100 - RSIVal);
-        }
+            if (rsiMode == 1) { rsiLong = rsiVal > RSIVal && rsiVal < (100 - RSIVal); rsiShort = rsiVal < (100 - RSIVal) && rsiVal > RSIVal; }
+            else if (rsiMode == 0) { rsiLong = rsiVal > RSIVal; rsiShort = rsiVal < (100 - RSIVal); }
+            else if (rsiMode == 2) { rsiLong = rsiVal < RSIVal; rsiShort = rsiVal > (100 - RSIVal); }
 
             bool bullSig = close > openHigh && maB && rsiLong;
             bool bearSig = close < openLow && maS && rsiShort;
+            
             double rejWick = -1;
-            if(bullSig)
-                rejWick = barH - Math.Max(open, close);
-            else if(bearSig)
-                rejWick = Math.Min(open, close) - barL;
+            if(bullSig) rejWick = barH - Math.Max(open, close);
+            else if(bearSig) rejWick = Math.Min(open, close) - barL;
             if(rejWick / totR > MaxRejectionWickRatio) return;
 
+            // --- 5. UPDATED BREAKOUT LOGIC (WICKS & GAPS) ---
+            bool signalTouchZone = (barL <= openHigh && barH >= openLow);
+            bool gapUpBreakout = (prevClose >= openLow && prevClose <= openHigh && open > openHigh);
+            bool gapDownBreakout = (prevClose >= openLow && prevClose <= openHigh && open < openLow);
 
-            if (open >= openLow && open <= openHigh)
+            // Inclusive operators as requested
+            if (bullSig)
             {
-                if (bullSig) ProcessEntry(TradeType.Buy);
-                else if (bearSig) ProcessEntry(TradeType.Sell);
+                if (signalTouchZone || gapUpBreakout) ProcessEntry(TradeType.Buy);
+            }
+            else if (bearSig)
+            {
+                if (signalTouchZone || gapDownBreakout) ProcessEntry(TradeType.Sell);
             }
         }
 
@@ -497,6 +468,8 @@ namespace cAlgo.Robots
         {
             double entry = (type == TradeType.Buy ? Symbol.Ask : Symbol.Bid);
             double? tpPrice = CalculateTPWithOverride(type, entry, sl);
+            if ((type == TradeType.Buy && tpPrice <= Symbol.Ask) || (type == TradeType.Sell && tpPrice >= Symbol.Bid))
+                return;
             double slPips = Math.Round(Math.Abs(entry - sl) / Symbol.PipSize, 1);
 
             if (SelectedTpMode == TpMode.TrailingOnly)
@@ -510,77 +483,49 @@ namespace cAlgo.Robots
             switch (SelectedTpMode)
             {   
                 case TpMode.Fixed:
-                    // Scalp Zone: 0.5 - 5.0 | Day Zone: 5.5 - 10.0 | Swing Zone: 10.5 - 15.0
                     baseTP = type == TradeType.Buy ? entry + (Math.Abs(entry - sl) * RRRatioLong) : entry - (Math.Abs(entry - sl) * RRRatioShort); 
                     break;
-
                 case TpMode.PivotPoints:
-                    double h = currentDayHigh;
-                    double l = currentDayLow;
-                    double c = currentDayClose;
+                    double h = currentDayHigh, l = currentDayLow, c = currentDayClose;
                     double pp = (h + l + c) / 3;
+                    double range = h - l;
+                    double gapH = h - pp;
+                    double gapL = pp - l;
 
-                    // Define Standard Levels
-                    double r1 = (2 * pp) - l;
-                    double s1 = (2 * pp) - h;
-                    double r2 = pp + (h - l);
-                    double s2 = pp - (h - l);
-                    double r3 = h + 2 * (pp - l);
-                    double s3 = l - 2 * (h - pp);
-                    double r4 = pp + 2 * (h - l);
-                    double s4 = pp - 2 * (h - l);
-                    double r5 = r4 + (h - l);
-                    double s5 = s4 - (h - l);
-                    double r6 = pp + 3 * (h - l);
-                    double s6 = pp - 3 * (h - l);
-                    double r7 = r6 + (h - l);
-                    double s7 = s6 - (h - l);
-                    double r8 = pp + 4 * (h - l);
-                    double s8 = pp - 4 * (h - l);
+                    // Standard Integer Levels (for reference)
+                    double r1 = (2 * pp) - l,        s1 = (2 * pp) - h;
+                    double r2 = pp + range,          s2 = pp - range;
+                    double r3 = h + 2 * (pp - l),    s3 = l - 2 * (h - pp);
+                    double r4 = pp + 2 * range,      s4 = pp - 2 * range;
+                    double r5 = r1 + 2 * range,      s5 = s1 - 2 * range;
+                    double r6 = pp + 3 * range,      s6 = pp - 3 * range;
+                    double r7 = r1 + 3 * range,      s7 = s1 - 3 * range;
+                    double r8 = pp + 4 * range,      s8 = pp - 4 * range;
 
-                    // Mapping the fractional levels (using PivotLevel as a double)
+                    // Requested Mid-Pivots (0.5 to 4.5)
+                    double r05 = pp + 0.5 * gapL;    double s05 = pp - 0.5 * gapH;
+                    double r15 = r1 + 0.5 * gapH;    double s15 = s1 - 0.5 * gapL;
+                    double r25 = r2 + 0.5 * gapL;    double s25 = s2 - 0.5 * gapH;
+                    double r35 = r3 + 0.5 * gapH;    double s35 = s3 - 0.5 * gapL;
+                    double r45 = r4 + 0.5 * gapL;    double s45 = s4 - 0.5 * gapH;
+
+                    // Requested Extended Levels (5.0 to 7.5)
+                    double r50 = r5;                 double s50 = s5;
+                    double r55 = r5 + 0.5 * gapH;    double s55 = s5 - 0.5 * gapL;
+                    double r60 = r6;                 double s60 = s6;
+                    double r65 = r6 + 0.5 * gapL;    double s65 = s6 - 0.5 * gapH;
+                    double r70 = r7;                 double s70 = s7;
+                    double r75 = r7 + 0.5 * gapH;    double s75 = s7 - 0.5 * gapL;
                     if (type == TradeType.Buy)
                     {
-                        if (PivotLevel <= 0.5) baseTP = (pp + r1) / 2; // Mid-point M3
-                        else if (PivotLevel <= 1.0) baseTP = r1;
-                        else if (PivotLevel <= 1.5) baseTP = (r1 + r2) / 2; // Mid-point M4
-                        else if (PivotLevel <= 2.0) baseTP = r2;
-                        else if (PivotLevel <= 2.5) baseTP = (r2 + r3) / 2; // Mid-point M5
-                        else if (PivotLevel <= 3.0) baseTP = r3;
-                        else if (PivotLevel <= 3.5) baseTP = (r3 + r4) / 2;
-                        else if (PivotLevel <= 4.0) baseTP = r4;
-                        else if (PivotLevel <= 4.5) baseTP = (r4 + r5) / 2;
-                        else if (PivotLevel <= 5.0) baseTP = r5;
-                        else if (PivotLevel <= 5.5) baseTP = (r5 + r6) / 2;
-                        else if (PivotLevel <= 6.0) baseTP = r6;
-                        else if (PivotLevel <= 6.5) baseTP = (r6 + r7) / 2;
-                        else if (PivotLevel <= 7.0) baseTP = r7;
-                        else if (PivotLevel <= 7.5) baseTP = (r7 + r8) / 2;
-                        else baseTP = r8; 
+                        if (PivotLevel <= 0.5) baseTP = r05; else if (PivotLevel <= 1) baseTP = r1; else if (PivotLevel <= 1.5) baseTP = r15; else if (PivotLevel <= 2) baseTP = r2; else if (PivotLevel <= 2.5) baseTP = r25; else if (PivotLevel <= 3) baseTP = r3; else if (PivotLevel <= 3.5) baseTP = r35; else if (PivotLevel <= 4) baseTP = r4; else if (PivotLevel <= 4.5) baseTP = r45; else if (PivotLevel <= 5) baseTP = r5; else if (PivotLevel <= 5.5) baseTP = r55; else if (PivotLevel <= 6) baseTP = r6; else if (PivotLevel <= 6.5) baseTP = r65; else if (PivotLevel <= 7) baseTP = r7; else if (PivotLevel <= 7.5) baseTP = r75; else if (PivotLevel <= 8) baseTP = r8;
                     }
-                    else // Short
+                    else
                     {
-                        if (PivotLevel <= 0.5) baseTP = (pp + s1) / 2; // Mid-point M2
-                        else if (PivotLevel <= 1.0) baseTP = s1;
-                        else if (PivotLevel <= 1.5) baseTP = (s1 + s2) / 2; // Mid-point M1
-                        else if (PivotLevel <= 2.0) baseTP = s2;
-                        else if (PivotLevel <= 2.5) baseTP = (s2 + s3) / 2; // Mid-point M0
-                        else if (PivotLevel <= 3.0) baseTP = s3;
-                        else if (PivotLevel <= 3.5) baseTP = (s3 + s4) / 2;
-                        else if (PivotLevel <= 4.0) baseTP = s4;
-                        else if (PivotLevel <= 4.5) baseTP = (s4 + s5) / 2;
-                        else if (PivotLevel <= 5.0) baseTP = s5;
-                        else if (PivotLevel <= 5.5) baseTP = (s5 + s6) / 2;
-                        else if (PivotLevel <= 6.0) baseTP = s6;
-                        else if (PivotLevel <= 6.5) baseTP = (s6 + s7) / 2;
-                        else if (PivotLevel <= 7.0) baseTP = s7;
-                        else if (PivotLevel <= 7.5) baseTP = (s7 + s8) / 2;
-                        else baseTP = s8;
+                        if (PivotLevel <= 0.5) baseTP = s05; else if (PivotLevel <= 1) baseTP = s1; else if (PivotLevel <= 1.5) baseTP = s15; else if (PivotLevel <= 2) baseTP = s2; else if (PivotLevel <= 2.5) baseTP = s25; else if (PivotLevel <= 3) baseTP = s3; else if (PivotLevel <= 3.5) baseTP = s35; else if (PivotLevel <= 4) baseTP = s4; else if (PivotLevel <= 4.5) baseTP = s45; else if (PivotLevel <= 5) baseTP = s5; else if (PivotLevel <= 5.5) baseTP = s55; else if (PivotLevel <= 6) baseTP = s6; else if (PivotLevel <= 6.5) baseTP = s65; else if (PivotLevel <= 7) baseTP = s7; else if (PivotLevel <= 7.5) baseTP = s75; else if (PivotLevel <= 8) baseTP = s8;
                     }
                     break;
-
                 case TpMode.SessionExtrema: 
-                    // Scalp: 1-2 | Day: 3-7 | Swing: 8-26
                     if (type == TradeType.Buy) baseTP = _dailyBars.HighPrices.Maximum(ExtremaLookbackDays);
                     else baseTP = _dailyBars.LowPrices.Minimum(ExtremaLookbackDays);
                     break;
@@ -600,7 +545,7 @@ namespace cAlgo.Robots
 
         private void DefineRanges()
         {
-            if (Server.Time.Hour == StartTime && Server.Time.Minute == OpenRangeMin)
+            if (Server.Time.Hour == StartHour && Server.Time.Minute == StartMinute)
             {
                 p1Index = _m1Bars.Count - LookbackMinutes; p1Price = _m1Bars.OpenPrices.Last(LookbackMinutes);
                 openHigh = _m1Bars.HighPrices.Last(1); openLow = _m1Bars.LowPrices.Last(1);
@@ -638,32 +583,37 @@ namespace cAlgo.Robots
         private bool IsHoliday(DateTime currentTime)
         {
             if (!EnableHolidayBlackout) return false;
-
-            int m = currentTime.Month;
-            int d = currentTime.Day;
-
-            if (BlackoutStartMonth <= BlackoutEndMonth)
-            {
-                // Handles blackouts within the same year (e.g., July 1 to July 10)
+            int m = currentTime.Month, d = currentTime.Day;
+            if (BlackoutStartMonth <= BlackoutEndMonth) {
                 DateTime start = new DateTime(currentTime.Year, BlackoutStartMonth, BlackoutStartDay);
                 DateTime end = new DateTime(currentTime.Year, BlackoutEndMonth, BlackoutEndDay);
                 return currentTime.Date >= start.Date && currentTime.Date <= end.Date;
-            }
-            else
-            {
-                // Handles cross-year blackouts (e.g., Dec 20 to Jan 5)
+            } else {
                 bool isAfterStart = (m > BlackoutStartMonth) || (m == BlackoutStartMonth && d >= BlackoutStartDay);
                 bool isBeforeEnd = (m < BlackoutEndMonth) || (m == BlackoutEndMonth && d <= BlackoutEndDay);
                 return isAfterStart || isBeforeEnd;
             }
         }
 
-        private bool CheckAdx(double val) => AdxMode switch { AdxFilterMode.Min => val >= AdxMin, AdxFilterMode.Max => val <= AdxMax, AdxFilterMode.MinMax => val >= AdxMin && val <= AdxMax, _ => true };
-        private bool EnableTrade() => !HasOpenPositionsForLabel() && AfterStart() && openHigh != 0 && !IsHoliday(Server.Time);
-        private bool AfterStart() 
+        private bool CheckAdx(double val) => AdxMode switch 
         { 
-            var n = Server.Time; 
-            return StartTime < EndTime ? (n.Hour >= StartTime && n.Hour < EndTime) : !(n.Hour >= EndTime && n.Hour < StartTime);
+            AdxFilterMode.Min => val >= AdxMin,
+            AdxFilterMode.Max => val <= AdxMax, 
+            AdxFilterMode.MinMax => val >= AdxMin && 
+            val <= AdxMax, _ => true 
+        };
+        private bool EnableTrade() => !HasOpenPositionsForLabel() && IsInWindow() && openHigh != 0 && !IsHoliday(Server.Time);
+        private bool IsInWindow()
+        {
+            var current = Server.Time.TimeOfDay;
+            var start = new TimeSpan(StartHour, StartMinute, 0);
+            var end = new TimeSpan(EndHour, 0, 0);
+
+            if (start < end)
+                return current >= start && current <= end;
+    
+            // Overnight logic: Start is 22:00, End is 04:00
+        return current >= start || current <= end;
         }
         private bool HasOpenPositionsForLabel() => Positions.Any(p => p.Label == Label && p.SymbolName == SymbolName);
         private double CalculateRisk(double pips) => (pips * Symbol.PipValue * Symbol.VolumeInUnitsStep) * (LotCalc(Risk, pips * Symbol.PipSize) / Symbol.VolumeInUnitsStep);
@@ -673,32 +623,57 @@ namespace cAlgo.Robots
             double mPS = (slD / Symbol.TickSize) * Symbol.TickValue * Symbol.VolumeInUnitsStep; 
             return Math.Round(Math.Clamp(Math.Floor(rM / mPS) * Symbol.VolumeInUnitsStep, Symbol.VolumeInUnitsMin, Symbol.VolumeInUnitsStep * 1000), 6);
         }
+        
         protected override double GetFitness(GetFitnessArgs args) 
         { 
-            if (args.NetProfit <= 0) return args.NetProfit; 
+            // 1. Initial Safety Checks
+            if (args.NetProfit <= 0) return args.NetProfit;
+            if (args.TotalTrades == 1) return 0;
+            if (args.TotalTrades < 75) return 0;
+
+
+            // 2. Detect Asset Class for Time Calculation
+            // Crypto trades 7 days; FX/Metals trade 5 days.
+            bool isCrypto = SymbolName.ToUpper().Contains("BTC") || 
+                            SymbolName.ToUpper().Contains("ETH") || 
+                            SymbolName.ToUpper().Contains("XBT");
+
+            TimeSpan duration = args.History.Last().ClosingTime - args.History.First().EntryTime;
+    
+            // Adjust the week divisor based on the asset class
+            double daysPerWeek = isCrypto ? 7.0 : 5.0;
+            double weeks = Math.Max(0.1, duration.TotalDays / daysPerWeek);
+            double tradesPerWeek = args.TotalTrades / weeks;
+    
+            // Minimum Floor: 2 trades per week.
+            double frequencyPenalty = Math.Min(1.0, tradesPerWeek / 2.0);
+            frequencyPenalty = Math.Pow(frequencyPenalty, 4); 
+
+            // 3. Core Math (R2 / Regression)
             var trades = args.History.OrderBy(t => t.ClosingTime).ToList(); 
             double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0, cum = 0; 
             for (int i = 0; i < trades.Count; i++) 
             { 
-                cum += trades[i].NetProfit; 
-                sumX += i; 
-                sumY += cum; 
-                sumXY += i * cum; 
-                sumX2 += i * i; 
-                sumY2 += cum * cum; 
+                cum += trades[i].NetProfit; sumX += i; sumY += cum; 
+                sumXY += i * cum; sumX2 += i * i; sumY2 += cum * cum; 
             } 
-            
-            double r2 = Math.Pow(((trades.Count * sumXY) - (sumX * sumY)) / Math.Sqrt(((trades.Count * sumX2) - (sumX * sumX)) * ((trades.Count * sumY2) - (sumY * sumY))), 2); 
-            if(args.MaxEquityDrawdownPercentages >= 5 && args.MaxEquityDrawdownPercentages < 10) 
-                return (((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2 * 0.5; 
-            else if(args.MaxEquityDrawdownPercentages >= 10)
-                return ((((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2) / args.MaxEquityDrawdownPercentages;
-            else if(args.TotalTrades <= MinTrades)
-                return ((((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2) * args.TotalTrades/MinTrades;
-            else if(args.TotalTrades > MinTrades && LinBon == true)
-                return (((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2 * (1 + (args.TotalTrades - MinTrades)/MinTrades/LinDiv); 
-            else
-                return (((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2 * (1 + (Math.Pow(args.TotalTrades - MinTrades, HypExp)/MinTrades));
+
+            double denominator = Math.Sqrt(((trades.Count * sumX2) - (sumX * sumX)) * ((trades.Count * sumY2) - (sumY * sumY)));
+            double r2 = (denominator == 0) ? 0 : Math.Pow(((trades.Count * sumXY) - (sumX * sumY)) / denominator, 2); 
+
+            // 4. Base Score Calculation (Incorporating your DD logic)
+            double baseScore;
+            if (args.MaxEquityDrawdownPercentages >= 10) 
+            {
+                baseScore = ((((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2) / args.MaxEquityDrawdownPercentages;
+            }
+            else 
+            {
+                baseScore = (((args.ProfitFactor * (args.NetProfit / Math.Max(1, args.MaxEquityDrawdown)) * ((double)args.WinningTrades / args.TotalTrades) * r2) * Math.Log10(args.TotalTrades)) / Math.Max(0.1, args.MaxEquityDrawdownPercentages)) * (args.NetProfit / startingBalance) * r2;
+            }
+
+            // 5. Apply Penalty
+            return baseScore; // * frequencyPenalty;
         }
     }
 }

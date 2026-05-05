@@ -9,7 +9,4 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Indicators\DynamicSnRBoxes_v2\DynamicSnRBoxes_v2\DynamicSnRBoxes_v2.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\Indicators\DynamicSnRBoxes\DynamicSnRBoxes\DynamicSnRBoxes.csproj" />
-  </ItemGroup>
 </Project>

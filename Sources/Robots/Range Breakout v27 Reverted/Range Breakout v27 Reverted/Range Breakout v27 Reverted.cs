@@ -512,7 +512,7 @@ namespace cAlgo.Robots
         { 
             if (args.NetProfit <= 0) return args.NetProfit; 
             var trades = args.History.OrderBy(t => t.ClosingTime).ToList(); 
-            if(args.TotalTrades < 25)
+            if(args.TotalTrades < 50)
                 return 0;
             double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0, cum = 0; 
             for (int i = 0; i < trades.Count; i++) 
