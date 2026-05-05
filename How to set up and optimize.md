@@ -384,7 +384,7 @@
 
 &nbsp;			Hyperbolic Exponent: If Linear Bonus? is set to "No", the number of trades is raised to this exponent rather than being divided. Smaller numbers for smaller bonuses, bigger numbers for bigger bonuses.
 
-
+***NOTE - THE INDICATOR TIE IN STOPPED WORKING AND SO IS CURRENTLY COMMENTED OUT IN THE CODE. I HOPE TO FIX IT AT SOME POINT, BUT I NEED TO GET MY FINANCES IN ORDER FIRST. AS SUCH, THE REMAINING PARAMETER GROUP INSTRUCTIONS ARE NOT CURRENTLY NECESSARY. THERE IS MORE BELOW THEM THOUGH.***
 
 ###### &nbsp;		Parameter Group 7. SnR Management
 
