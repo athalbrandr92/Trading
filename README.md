@@ -16,4 +16,4 @@ Institutional-Grade cTrader Algo Suite 📈
 A complete, open-source algorithmic trading suite, designed specifically for passing and managing Proprietary Trading Firm evaluation accounts.
 
 ⚠️ IMPORTANT DISCLAIMER ⚠️
-This is not a magical ATM. These algorithms are highly surgical tools. They are designed to strictly limit drawdown and protect equity. If you disable the risk management parameters, crank your leverage to maximum, and run this without proper genetic optimization for your specific broker's spread, you will blow your account. Use responsibly, optimize on quality tick data, and test on a demo account first.
+This is not a magical ATM. These algorithms are highly surgical tools. They are designed to strictly limit drawdown and protect equity. If you disable the risk management parameters, crank your leverage to maximum, and run this without proper genetic optimization for your specific broker's spread, you will blow your account. Use responsibly, optimize on quality tick data, and test on training data first.
