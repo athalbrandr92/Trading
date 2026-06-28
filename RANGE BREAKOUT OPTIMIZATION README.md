@@ -11,7 +11,7 @@ Strength: Performs reliably during periods of market certainty and structural tr
 Weakness: It lacks a dynamic "regime filter." It fails during extreme geopolitical volatility or "Black Swan" events where price action disconnects from technical range logic.
 
 Usage Note:
-It is still profitable, but it requires a user who understands market context. It is not a "set-and-forget" tool. If you are looking for a system that adapts its strategy based on the underlying physics of the market (Velocity, Acceleration, Jerk, Snap), refer to my current CalculusSystem repository.
+It is still profitable (if the current version isn't stable, look for one uploaded around the middle-to-end of February - that's when I passed Phase One of my prop firm challenge), but it requires a user who understands market context. It is not a "set-and-forget" tool. If you are looking for a system that adapts its strategy based on the underlying physics of the market (Velocity, Acceleration, Jerk, Snap), refer to my current CalculusSystem repository.
 
 Optimizer parameters for Range Breakout v27
 
