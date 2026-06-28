@@ -1,3 +1,18 @@
+## Range Breakout Bot (Legacy Architecture)
+
+[Project Status: Deprecated / Archived]
+
+This is a monolithic "God EA." Unlike the modular Calculus System I am currently developing, this bot attempts to handle logic, risk, and execution in a single, un-interfaced script.
+
+Operational Profile:
+
+Strength: Performs reliably during periods of market certainty and structural transitions. It captures range-bound breakouts effectively when technical levels hold validity.
+
+Weakness: It lacks a dynamic "regime filter." It fails during extreme geopolitical volatility or "Black Swan" events where price action disconnects from technical range logic.
+
+Usage Note:
+It is still profitable, but it requires a user who understands market context. It is not a "set-and-forget" tool. If you are looking for a system that adapts its strategy based on the underlying physics of the market (Velocity, Acceleration, Jerk, Snap), refer to my current CalculusSystem repository.
+
 Optimizer parameters for Range Breakout v27
 
 🚀 **PRO TIP:** For maximum speed, disable any indicator filters (ADX, RSI, MA) you aren't currently testing. V27 now uses conditional wake-ups, meaning the bot only communicates with the S&R Indicator when a position is open, drastically reducing backtesting time.
