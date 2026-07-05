@@ -51,20 +51,23 @@ public:
     // --- The Calculation ---
     // We accept 'double' for inputs because velocity/accel are physical 
     // measurements that change incrementally. 
-    double CalculateLotSize(double velocity, double acceleration, double jerk) {
+    double CalculateLotSize(double velocity, double acceleration, double normalAcc, double jerk) {
         
         // If we failed validation, we revert to the absolute safest option (fixed lot).
         if(!Validate() || !m_useDynamic) return m_fixedLot;
 
-        // --- Math Logic ---
-        // Why these specific operations? 
-        // We are building a dynamic Stop Loss (SL) based on "Jerk" (the change in acceleration).
-        // If the market is erratic (high jerk), we widen the SL to avoid getting 
-        // stopped out by "noise."
-        double absVel = MathAbs(velocity);
-        double absAcc = MathMax(MathAbs(acceleration), 0.0001); 
-        
-        double dynamicSL = (2.0 * absVel) / absAcc; 
+        // --- Math Logic (Directional & Corridored) ---
+        double epsilon = 0.0001;
+        double stabilityFactor = MathMax(MathAbs(jerk), epsilon);
+
+        // normalAcc represents the expected acceleration range for the symbol
+        // We use a corridor approach: if acceleration is within 'normal' bounds, we stay tight.
+        // If it breaks the bounds, we widen the SL.
+        bool isAnomaly = (MathAbs(acceleration) > normalAcc);
+
+        double accFactor = isAnomaly ? 1.5 : 1.0; 
+
+        double dynamicSL = ((2.0 * MathAbs(velocity)) + (5.0 * stabilityFactor)) * accFactor; 
 
         // We convert the 'double' (dynamicSL) into an 'int' (slPoints) because 
         // the broker's API only accepts whole numbers for "points."
